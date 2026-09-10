@@ -33,6 +33,21 @@ Update: 2026-09-10 (sesi 1)
 - Menunggu: jawaban 7 pertanyaan (`01-SPEK.md`) + kata **"eksekusi"**
 - Setelah itu: mulai `tugas/T01-scaffolding.md`
 
+## Disiplin Checkpoint & Anti-Loop (WAJIB semua sesi)
+1. Urutan kerja = sub-task PERTAMA yang belum dicentang di file `tugas/T0x` aktif.
+   Sub-task yang sudah ✅ TIDAK boleh dikerjakan ulang.
+2. ✅ hanya boleh jika **acceptance criteria** sub-task itu terpenuhi
+   (lihat bagian Acceptance di file tugasnya).
+3. Tiap sub-task/fase selesai: update `STATE.md` + `06-LOG-SESI.md` +
+   `git commit`. **Tanpa commit = pekerjaan dianggap belum selesai**
+   (agar sesi baru bisa cross-check via `git log --oneline`).
+4. Batas retry: sub-task yang sama maksimal 3x percobaan. Gagal terus →
+   catat penyebab + opsi solusi di `07-EROR.md`, tandai ⚠ BLOCKED,
+   BERHENTI, dan laporkan ke pengguna (jangan retry tanpa batas).
+5. Di awal sesi: jalankan `git log --oneline` dan cocokkan dengan checklist.
+   Jika log menunjukkan pekerjaan yang belum tercatat → perbaiki catatan,
+   jangan ulang pekerjaannya.
+
 ## Ringkasan Estimasi (dari sesi 1)
 
 - Total token proyek: ±150rb–250rb (kumulatif semua sesi)
