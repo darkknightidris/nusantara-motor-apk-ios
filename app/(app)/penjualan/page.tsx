@@ -149,7 +149,7 @@ export default function PenjualanPage() {
       setNotes("");
       setItems([{ ...EMPTY_ITEM }]);
       void load();
-      router.push(`/penjualan/${sale.id}`);
+      router.push(`/penjualan/nota?id=${sale.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Gagal menyimpan penjualan.");
     } finally {
@@ -334,7 +334,7 @@ export default function PenjualanPage() {
             <li key={s.id}>
               <button
                 type="button"
-                onClick={() => router.push(`/penjualan/${s.id}`)}
+                onClick={() => router.push(`/penjualan/nota?id=${s.id}`)}
                 className="flex w-full items-center justify-between gap-3 rounded-2xl bg-surface p-4 text-left shadow-sm ring-1 ring-border-soft active:bg-slate-50"
               >
                 <span className="min-w-0">

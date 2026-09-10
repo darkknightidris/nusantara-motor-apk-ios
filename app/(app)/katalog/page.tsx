@@ -171,7 +171,7 @@ export default function KatalogPage() {
               <ul className="divide-y divide-border-soft">
                 {groups[brand].map((p) => (
                   <li key={p.id}>
-                    <Link href={`/katalog/${p.id}`} className="flex items-center justify-between gap-3 py-2.5 active:bg-slate-100/60">
+                    <Link href={`/katalog/produk?id=${p.id}`} className="flex items-center justify-between gap-3 py-2.5 active:bg-slate-100/60">
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium">{p.name}</span>
                         {p.category ? (

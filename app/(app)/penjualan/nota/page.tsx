@@ -2,9 +2,9 @@
 
 // Nota penjualan: rincian item, total, dan tombol cetak (window.print).
 // Saat dicetak, hanya area nota yang tampil (lihat aturan @media print di globals.css).
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { formatDateTime, formatRupiah } from "@/lib/format";
@@ -13,10 +13,10 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Loading from "@/components/ui/Loading";
 
-export default function DetailPenjualanPage() {
+function DetailPenjualanPage() {
   const router = useRouter();
-  const params = useParams<{ id: string }>();
-  const id = params.id;
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id") ?? "";
   const { user } = useSession();
 
   const [sale, setSale] = useState<Sale | null>(null);
@@ -172,5 +172,14 @@ export default function DetailPenjualanPage() {
         </Button>
       </div>
     </div>
+  );
+}
+
+// output: export tidak mendukung route dinamis [id]; id kini lewat query string.
+export default function Page() {
+  return (
+    <Suspense fallback={<Loading label="Memuat..." />}>
+      <DetailPenjualanPage />
+    </Suspense>
   );
 }

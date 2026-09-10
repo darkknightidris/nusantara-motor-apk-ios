@@ -2,9 +2,9 @@
 
 // Detail produk: informasi + tabel harga, kelebihan, dan kegunaan kendaraan
 // (guides). Owner dapat mengedit data produk, mengelola guides, dan menghapus.
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { formatRupiah } from "@/lib/format";
@@ -65,10 +65,10 @@ const num = (v: string) => {
   return Number.isFinite(n) && v.trim() !== "" ? n : 0;
 };
 
-export default function DetailProdukPage() {
+function DetailProdukPage() {
   const router = useRouter();
-  const params = useParams<{ id: string }>();
-  const id = params.id;
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id") ?? "";
   const { user } = useSession();
   const isOwner = user?.role === "owner";
 
@@ -484,5 +484,14 @@ export default function DetailProdukPage() {
         )}
       </Card>
     </div>
+  );
+}
+
+// output: export tidak mendukung route dinamis [id]; id kini lewat query string.
+export default function Page() {
+  return (
+    <Suspense fallback={<Loading label="Memuat..." />}>
+      <DetailProdukPage />
+    </Suspense>
   );
 }

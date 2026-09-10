@@ -10,7 +10,7 @@ Log: `C:\temp\nusantara_t01b.log` · Status: `C:\temp\nusantara_t01_status.txt`
 | # | Fase | Status | Detail |
 |---|------|--------|--------|
 | 0 | Spesifikasi & keputusan | ✅ | 7/7 terjawab & dikunci (lihat `01-SPEK.md`) |
-| 1 | Scaffolding + Capacitor | ⏳ berjalan (restart) | source siap (langkah 1–3 ✅, ter-commit); script `C:\temp\nusantara_t01b.ps1`: npm install → next build → cap deps → cap init → install SDK → cap add → plugin → cap sync |
+| 1 | Scaffolding + Capacitor | ⏳ berjalan (restart #2) | SWC di-fix (tarball resmi); route dinamis `[id]` dikonversi ke `?id=` (static export); script `C:\temp\nusantara_t01b.ps1` di-jalankan ulang |
 | 2 | Lapisan DB lokal (SQLite) | ⬜ | `tugas/T02-db-lokal.md` |
 | 3 | Adaptasi modul UI + xlsx/pdf | ⬜ | `tugas/T03-adaptasi-modul.md` |
 | 4 | Seeding + backup/restore | ⬜ | `tugas/T04-seeding-backup.md` |
