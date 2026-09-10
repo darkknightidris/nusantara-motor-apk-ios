@@ -70,6 +70,20 @@ const tableCols = new Map<string, string[]>();
  * Inisialisasi DB (idempoten, aman dipanggil berulang).
  * open → PRAGMA foreign_keys → DDL → meta.db_version.
  */
+/**
+ * Tutup koneksi DB (dipakai restore backup: close → ganti isi → open).
+ * Setelah ini ensureDb() akan menginisialisasi ulang dari nol.
+ */
+export async function closeDb(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await CapacitorSQLite.close({ database: DB });
+  } catch {
+    // koneksi mungkin sudah tertutup — abaikan.
+  }
+  ready = null;
+}
+
 export function ensureDb(): Promise<void> {
   if (ready) return ready;
   ready = (async () => {

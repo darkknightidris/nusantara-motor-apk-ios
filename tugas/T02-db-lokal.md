@@ -1,6 +1,6 @@
 # T02 — Lapisan DB Lokal (SQLite)
 
-Status: 🔄 berjalan — sub-task 5/8 selesai (sisa: 7 hapus fetch/lib/api.ts, 8 uji runtime fase 5)
+Status: 🔄 sub-task 1–7/8 selesai — sisa: 8 uji runtime (dipindah ke FASE 5/T05)
 
 ## Tujuan
 `lib/db.ts` + `lib/localApi.ts` siap dipakai semua modul; auth lokal jalan.
@@ -64,7 +64,14 @@ Status: 🔄 berjalan — sub-task 5/8 selesai (sisa: 7 hapus fetch/lib/api.ts, 
       dgn backend lama), deriveStatus utk createTransaction/payTransaction
       (toleransi 1e-9 sama dgn backend), validasi payload (validateProductPayload,
       qty/price/total/username/role), subtotal sale direkomputasi qty×price.
-- [ ] Hapus panggilan fetch/`API_BASE_URL` tersisa (grep `fetch(`, `apiBase`)
+- [x] Hapus panggilan fetch/`API_BASE_URL` tersisa (grep `fetch(`, `apiBase`)
+      ✅ (2026-09-10, sesi 5): grep `fetch(`, `API_BASE`, `NEXT_PUBLIC_API_URL`,
+      `apiBase`, `@/lib/api` di seluruh repo (ts/tsx/mjs + default) = 0 sisa
+      di app/, lib/, components/, scripts/ (hanya dokumen .md historis).
+      `lib/api.ts` dihapus via `git rm`. Tidak ada file `.env*` di repo
+      (env tak terpakai = tidak ada yang dihapus). `next.config.ts` bersih
+      (hanya output:export). `tsc --noEmit` bersih; `next build` OK (12
+      halaman) pasca-hapus.
 - [ ] Unit-check manual via WebView console (atau uji di fase 5)
 
 ## Acceptance

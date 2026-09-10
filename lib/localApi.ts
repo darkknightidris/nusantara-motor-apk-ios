@@ -580,6 +580,25 @@ export const localApi = {
   },
 
   // ===== Sales =====
+  // Daftar SEMUA guides (modul Panduan) — join nama produk utk tampilan.
+  listGuides: async (): Promise<(ProductGuide & { product_name: string })[]> => {
+    const rows = await qRows(
+      "SELECT g.id, g.product_id, g.vehicle_brand, g.vehicle_model, g.vehicle_year, g.vehicle_cc, g.notes, p.name FROM guides g JOIN products p ON p.id = g.product_id ORDER BY p.name COLLATE NOCASE, g.id"
+    );
+    return rows.map((r) => ({
+      ...toGuideRow({
+        id: s(r[0]),
+        product_id: s(r[1]),
+        vehicle_brand: s(r[2]),
+        vehicle_model: s(r[3]),
+        vehicle_year: s(r[4]),
+        vehicle_cc: s(r[5]),
+        notes: s(r[6]),
+      }),
+      product_name: s(r[7]) ?? "",
+    }));
+  },
+
   listSales: async (): Promise<Sale[]> => {
     const sales = await qAll("sales", "SELECT * FROM sales ORDER BY created_at DESC");
     const ids = sales.map((x) => String(x.id));
