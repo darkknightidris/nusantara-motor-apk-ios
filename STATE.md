@@ -18,7 +18,7 @@ Update: 2026-09-10 (sesi 1)
 
 ## Keputusan Terkunci (jangan berubah tanpa izin pengguna)
 
-- Repo utama: `C:\Users\idris\nusantara-motor-apk-full-offline`
+- Repo utama: `C:\Users\idris\Desktop\nusantara-motor-apk-full-offline`
 - Arsitektur: **Capacitor 7 + Next.js static export + SQLite lokal**
   (bukan React Native / Flutter — alasannya di `02-ARSITEKTUR.md`)
 - UI: salin dari `nusantara-motor-pwa` (tampilan yang sudah dikenali klien)

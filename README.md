@@ -13,7 +13,7 @@ SQLite lokal**. Terpasang seperti APK biasa.
 ## Protokol Sesi Baru (WAJIB)
 
 Prompt untuk sesi baru:
-> Lanjut project Nusantara Motor APK full offline yg ada di C:\Users\idris\nusantara-motor-apk-full-offline, baca state file dulu
+> Lanjut project Nusantara Motor APK full offline yg ada di C:\Users\idris\Desktop\nusantara-motor-apk-full-offline, baca state file dulu
 
 Langkah agen di awal sesi:
 1. Baca `STATE.md` (posisi + checklist fase).
@@ -38,7 +38,7 @@ Langkah agen di awal sesi:
 
 ## Fakta Cepat
 
-- Repo: `C:\Users\idris\nusantara-motor-apk-full-offline`
+- Repo: `C:\Users\idris\Desktop\nusantara-motor-apk-full-offline`
 - State: `STATE.md` (source of truth)
 - Arsitektur: Capacitor 7 + Next.js static export + SQLite lokal
 - Auth: lokal (username + hash SHA-256 + salt), role `owner`/`kasir`
