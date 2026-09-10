@@ -1,46 +1,36 @@
-# Nusantara Motor APK — Full Offline
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Aplikasi Android (APK) **full offline** untuk operasional Nusantara Motor:
-penjualan, katalog/stok, keuangan (hutang/piutang), panduan kegunaan, profil,
-dan manajemen user. **100% data & logika di perangkat** — tanpa internet,
-tanpa cloud/SaaS, tanpa database cloud, tanpa authentication provider,
-tanpa signup.
+## Getting Started
 
-Tampilan & fitur = replika dari web lama (`C:\Users\idris\nusantara-motor`)
-dan PWA (`C:\Users\idris\nusantara-motor-pwa`), dibungkus **Capacitor +
-SQLite lokal**. Terpasang seperti APK biasa.
+First, run the development server:
 
-## Protokol Sesi Baru (WAJIB)
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-Prompt untuk sesi baru:
-> Lanjut project Nusantara Motor APK full offline yg ada di C:\Users\idris\Desktop\nusantara-motor-apk-full-offline, baca state file dulu
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-Langkah agen di awal sesi:
-1. Baca `STATE.md` (posisi + checklist fase).
-2. Baca `06-LOG-SESI.md` (entry terakhir) + `07-EROR.md` (jangan ulangi kesalahan yang sudah diperbaiki).
-3. Lanjut sub-task berikutnya sesuai file `tugas/T0x-*.md`.
-4. Di akhir tiap checkpoint: update `STATE.md` + tambahkan entry di `06-LOG-SESI.md`.
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## Peta File
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-| File | Fungsi |
-|---|---|
-| `README.md` | Entry point (file ini) |
-| `STATE.md` | **Source of truth**: posisi saat ini, checklist fase, keputusan terkunci, next action |
-| `01-SPEK.md` | Spesifikasi, constraint, cakupan modul, pertanyaan terbuka |
-| `02-ARSITEKTUR.md` | Arsitektur + log keputusan + risiko |
-| `03-TEKNOLOGI.md` | Semua teknologi: stack lama, stack target, status environment |
-| `04-SCHEMA-DB.md` | Skema SQLite lokal (draft dari types.ts backend) |
-| `05-ALUR.md` | Pipeline 6 fase + sub-task |
-| `06-LOG-SESI.md` | Log progres lintas sesi |
-| `07-EROR.md` | Log error & fix (jangan ulangi) |
-| `tugas/T01-scaffolding.md` … `tugas/T06-rilis-serah-terima.md` | Detail tugas per fase |
+## Learn More
 
-## Fakta Cepat
+To learn more about Next.js, take a look at the following resources:
 
-- Repo: `C:\Users\idris\Desktop\nusantara-motor-apk-full-offline`
-- State: `STATE.md` (source of truth)
-- Arsitektur: Capacitor 7 + Next.js static export + SQLite lokal
-- Auth: lokal (username + hash SHA-256 + salt), role `owner`/`kasir`
-- Build: Node 24 + JDK 21 + Android SDK (di-install fase 5) + Gradle wrapper
-- Owner: Mohammad Idris Suropati (klien: Nusantara Motor)
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

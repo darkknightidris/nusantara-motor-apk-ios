@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Design system Nusantara Motor */
+  --color-primary: #1d4ed8;
+  --color-success: #059669;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-surface: #ffffff;
+  --color-border-soft: #e2e8f0;
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+/* Cetak nota penjualan: sembunyikan elemen navigasi/fixed agar hanya isi
+   halaman yang tercetak. */
+@media print {
+  .fixed {
+    display: none !important;
+  }
+}

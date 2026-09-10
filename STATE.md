@@ -1,15 +1,16 @@
 # STATE — Source of Truth
 
-Update: 2026-09-10 (sesi 1)
-**Posisi sekarang: FASE 0 (spesifikasi)** — menunggu jawaban 7 pertanyaan
-(di `01-SPEK.md`) + kata "eksekusi" dari pengguna.
+Update: 2026-09-10 (sesi 3)
+**Posisi sekarang: FASE 1 (T01 scaffolding)** — build di-RESTART (script sesi 2 terbukti tak pernah jalan — lihat `07-EROR.md` #9; source langkah 1–3 sudah ✅ & ter-commit).
+Log: `C:\temp\nusantara_t01b.log` · Status: `C:\temp\nusantara_t01_status.txt`
+(nilai: `T01_RUNNING` / `T01_DONE` / `T01_FAIL_<langkah>`)
 
 ## Checklist Fase
 
 | # | Fase | Status | Detail |
 |---|------|--------|--------|
-| 0 | Spesifikasi & keputusan | ⏳ berjalan | 7 pertanyaan di `01-SPEK.md` belum dijawab |
-| 1 | Scaffolding + Capacitor | ⬜ | `tugas/T01-scaffolding.md` |
+| 0 | Spesifikasi & keputusan | ✅ | 7/7 terjawab & dikunci (lihat `01-SPEK.md`) |
+| 1 | Scaffolding + Capacitor | ⏳ berjalan (restart) | source siap (langkah 1–3 ✅, ter-commit); script `C:\temp\nusantara_t01b.ps1`: npm install → next build → cap deps → cap init → install SDK → cap add → plugin → cap sync |
 | 2 | Lapisan DB lokal (SQLite) | ⬜ | `tugas/T02-db-lokal.md` |
 | 3 | Adaptasi modul UI + xlsx/pdf | ⬜ | `tugas/T03-adaptasi-modul.md` |
 | 4 | Seeding + backup/restore | ⬜ | `tugas/T04-seeding-backup.md` |
@@ -25,13 +26,22 @@ Update: 2026-09-10 (sesi 1)
 - Auth: lokal (username + hash SHA-256 + salt), role `owner`/`kasir` dipertahankan
 - State file: `STATE.md` di dalam repo ini
 - Protokol sesi baru: lihat `README.md`
-- Constraint: runtime 100% lokal; download pihak ketiga hanya boleh
-  build-time (npm, Gradle, Android SDK) — tanpa akun/signup
+- Cakupan: full 8 modul web lama, layout mobile ala PWA (#1)
+- Seeding: A+B — DB ter-seed di-bake + menu import xlsx (#2)
+- Akun awal: `mastaufiq` / `admin`, role owner (#3)
+- Signing: debug dulu, release + keystore di fase 6 (#4)
+- Nama app: "Nusantara Company" (#5)
+- Multi-perangkat: full offline dulu; sync antar perangkat = fase lanjutan (#7)
 
 ## Next Action
 
-- Menunggu: jawaban 7 pertanyaan (`01-SPEK.md`) + kata **"eksekusi"**
-- Setelah itu: mulai `tugas/T01-scaffolding.md`
+- Cek `C:\temp\nusantara_t01_status.txt`:
+  - `T01_DONE` → verifikasi artefak (node_modules, out/, capacitor.config.ts,
+    android/, 3 plugin), tandai fase 1 ✅ di STATE + `tugas/T01-scaffolding.md`,
+    git commit, lanjut `tugas/T02-db-lokal.md`
+  - `T01_FAIL_*` → baca `C:\temp\nusantara_t01b.log`, perbaiki,
+    catat di `07-EROR.md`, jalankan ulang script T01
+- Checkpoint: update STATE + log + git commit di akhir tiap fase.
 
 ## Disiplin Checkpoint & Anti-Loop (WAJIB semua sesi)
 1. Urutan kerja = sub-task PERTAMA yang belum dicentang di file `tugas/T0x` aktif.
