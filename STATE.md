@@ -1,7 +1,7 @@
 # STATE — Source of Truth
 
 Update: 2026-09-10 (sesi 3)
-**Posisi sekarang: FASE 1 (T01 scaffolding)** — build di-RESTART (script sesi 2 terbukti tak pernah jalan — lihat `07-EROR.md` #9; source langkah 1–3 sudah ✅ & ter-commit).
+**Posisi sekarang: FASE 2 (T02 lapisan DB lokal SQLite)** — FASE 1 SELESAI & terverifikasi.
 Log: `C:\temp\nusantara_t01b.log` · Status: `C:\temp\nusantara_t01_status.txt`
 (nilai: `T01_RUNNING` / `T01_DONE` / `T01_FAIL_<langkah>`)
 
@@ -10,7 +10,7 @@ Log: `C:\temp\nusantara_t01b.log` · Status: `C:\temp\nusantara_t01_status.txt`
 | # | Fase | Status | Detail |
 |---|------|--------|--------|
 | 0 | Spesifikasi & keputusan | ✅ | 7/7 terjawab & dikunci (lihat `01-SPEK.md`) |
-| 1 | Scaffolding + Capacitor | ⏳ berjalan (restart #2) | SWC di-fix (tarball resmi); route dinamis `[id]` dikonversi ke `?id=` (static export); script `C:\temp\nusantara_t01b.ps1` di-jalankan ulang |
+| 1 | Scaffolding + Capacitor | ✅ | Acceptance tercapai: `next build` → `out/`, `android/` ter-generate, 3 plugin (sqlite 8.1.1, filesystem 8.1.3, share 8.0.1) + core/android/cli, `cap sync` OK, commit ada (lihat `tugas/T01-scaffolding.md`) |
 | 2 | Lapisan DB lokal (SQLite) | ⬜ | `tugas/T02-db-lokal.md` |
 | 3 | Adaptasi modul UI + xlsx/pdf | ⬜ | `tugas/T03-adaptasi-modul.md` |
 | 4 | Seeding + backup/restore | ⬜ | `tugas/T04-seeding-backup.md` |
@@ -35,12 +35,9 @@ Log: `C:\temp\nusantara_t01b.log` · Status: `C:\temp\nusantara_t01_status.txt`
 
 ## Next Action
 
-- Cek `C:\temp\nusantara_t01_status.txt`:
-  - `T01_DONE` → verifikasi artefak (node_modules, out/, capacitor.config.ts,
-    android/, 3 plugin), tandai fase 1 ✅ di STATE + `tugas/T01-scaffolding.md`,
-    git commit, lanjut `tugas/T02-db-lokal.md`
-  - `T01_FAIL_*` → baca `C:\temp\nusantara_t01b.log`, perbaiki,
-    catat di `07-EROR.md`, jalankan ulang script T01
+- Mulai `tugas/T02-db-lokal.md` (lapisan DB lokal SQLite):
+  baca file tugasnya → sub-task PERTAMA yang belum dicentang → eksekusi →
+  update STATE + log + commit saat selesai.
 - Checkpoint: update STATE + log + git commit di akhir tiap fase.
 
 ## Disiplin Checkpoint & Anti-Loop (WAJIB semua sesi)
