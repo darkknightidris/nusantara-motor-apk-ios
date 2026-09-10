@@ -1,5 +1,8 @@
 import type { MetadataRoute } from "next";
 
+// output: export: route webmanifest wajib statis (bukan SSR/revalidate).
+export const dynamic = "force-static";
+
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Nusantara Company",
