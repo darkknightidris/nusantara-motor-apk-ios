@@ -5,7 +5,7 @@
 // produk, namun tetap bisa diubah manual oleh kasir.
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
+import { localApi as api, ApiError } from "@/lib/localApi";
 import { useSession } from "@/lib/session";
 import { formatDateTime, formatRupiah } from "@/lib/format";
 import type { PriceType, Product, Sale, SaleItemInput } from "@/lib/types";

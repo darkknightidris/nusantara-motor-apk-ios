@@ -1,11 +1,11 @@
 "use client";
 
 // Dashboard: ringkasan operasional hari ini (penjualan, hutang/piutang, stok
-// menipis). Semua data diambil dari backend nyata; loading/error/empty state
-// ditampilkan secara eksplisit.
+// menipis). Semua data diambil dari SQLite lokal (localApi); loading/error/
+// empty state ditampilkan secara eksplisit.
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, ApiError } from "@/lib/api";
+import { localApi as api, ApiError } from "@/lib/localApi";
 import { useSession } from "@/lib/session";
 import { formatRupiah, isToday } from "@/lib/format";
 import type { Product, Sale } from "@/lib/types";

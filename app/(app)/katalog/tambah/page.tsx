@@ -5,7 +5,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
+import { localApi as api, ApiError } from "@/lib/localApi";
 import { useSession } from "@/lib/session";
 import type { ProductPayload } from "@/lib/types";
 import Button from "@/components/ui/Button";

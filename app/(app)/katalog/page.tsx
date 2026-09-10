@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
+import { localApi as api, ApiError } from "@/lib/localApi";
 import { useSession } from "@/lib/session";
 import { formatRupiah } from "@/lib/format";
 import type { Product, ProductImportResult } from "@/lib/types";

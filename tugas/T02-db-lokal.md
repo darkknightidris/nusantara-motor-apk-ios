@@ -1,6 +1,6 @@
 # T02 — Lapisan DB Lokal (SQLite)
 
-Status: 🔄 berjalan — sub-task 6/8 selesai (sisa: 5 ganti import halaman, 7 hapus fetch, 8 uji runtime fase 5)
+Status: 🔄 berjalan — sub-task 5/8 selesai (sisa: 7 hapus fetch/lib/api.ts, 8 uji runtime fase 5)
 
 ## Tujuan
 `lib/db.ts` + `lib/localApi.ts` siap dipakai semua modul; auth lokal jalan.
@@ -44,7 +44,17 @@ Status: 🔄 berjalan — sub-task 6/8 selesai (sisa: 5 ganti import halaman, 7 
       PRODUCT_COLS_ARR (bukan string.slice), getGuidesByProduct & listUsers via
       qRows (qAll hanya valid utk SELECT * tanpa join), Blob utk writeFile, Share
       tanpa mimeType.
-- [ ] Ganti import di semua halaman: `api` → `localApi`
+- [x] Ganti import di semua halaman: `api` → `localApi`
+      ✅ (2026-09-10, sesi 5): 6 halaman app/(app) (dashboard, katalog, produk,
+      tambah, penjualan, nota) + `lib/session.ts` (dynamic import login) kini
+      import dari `@/lib/localApi`. Pola: `import { localApi as api, ApiError }
+      from "@/lib/localApi"` (alias — 21 call-site `api.*` tak perlu diubah,
+      diff minimal & stabil utk re-sync dari source PWA di T03). Komentari
+      header dashboard & session.ts disesuaikan (backend nyata → SQLite
+      lokal; token JWT → token lokal "local-<user_id>"). Verifikasi:
+      `tsc --noEmit` bersih, `next build` OK (12 halaman), grep `@/lib/api`
+      di app/ & lib/ = 0 sisa. Catatan: `lib/api.ts` masih ada (dihapus di
+      sub-task 7).
 - [x] Logika business yang tadinya di backend dipindah ke klien:
       - stock produk berkurang saat sale tersimpan
       - `status` transaksi di-derive dari `paid_amount`/`total_amount`

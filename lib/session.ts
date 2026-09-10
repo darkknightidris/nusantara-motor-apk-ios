@@ -3,8 +3,8 @@
 // Session store berbasis useSyncExternalStore: token + user disimpan di
 // localStorage dan dibaca sebagai snapshot eksternal. Tidak ada setState di
 // dalam effect, sehingga aman untuk hidrasi SSR dan bebas dari cascading
-// renders. Token JWT backend (HS256, exp 24 jam) hanya nilai sesi — secret
-// JWT tidak pernah masuk ke bundle client.
+// renders. Token lokal (bukan JWT; "local-<user_id>") hanya nilai sesi di
+// localStorage — tidak ada secret yang masuk ke bundle client.
 import { useCallback, useSyncExternalStore } from "react";
 import type { AuthUser, LoginResponse } from "@/lib/types";
 
@@ -66,7 +66,7 @@ export function useSession() {
   const state = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY);
 
   const login = useCallback(async (username: string, password: string) => {
-    const { api } = await import("@/lib/api");
+    const { localApi: api } = await import("@/lib/localApi");
     const res: LoginResponse = await api.login(username, password);
     persist({ token: res.token, user: { id: "", username: res.username, role: res.role } });
   }, []);

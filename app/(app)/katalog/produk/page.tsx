@@ -5,7 +5,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, ApiError } from "@/lib/api";
+import { localApi as api, ApiError } from "@/lib/localApi";
 import { useSession } from "@/lib/session";
 import { formatRupiah } from "@/lib/format";
 import type { GuidePayload, Product, ProductGuide, ProductPayload } from "@/lib/types";
