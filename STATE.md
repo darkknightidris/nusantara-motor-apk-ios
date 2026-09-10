@@ -1,7 +1,7 @@
 # STATE — Source of Truth
 
 Update: 2026-09-10 (sesi 4)
-**Posisi sekarang: FASE 2 (T02 lapisan DB lokal SQLite) — sub-task 1/8 selesai** — FASE 1 SELESAI & terverifikasi.
+**Posisi sekarang: FASE 2 (T02 lapisan DB lokal SQLite) — sub-task 6/8 selesai** — FASE 1 SELESAI & terverifikasi.
 Log: `C:\temp\nusantara_t01b.log` · Status: `C:\temp\nusantara_t01_status.txt`
 (nilai: `T01_RUNNING` / `T01_DONE` / `T01_FAIL_<langkah>`)
 
@@ -11,7 +11,7 @@ Log: `C:\temp\nusantara_t01b.log` · Status: `C:\temp\nusantara_t01_status.txt`
 |---|------|--------|--------|
 | 0 | Spesifikasi & keputusan | ✅ | 7/7 terjawab & dikunci (lihat `01-SPEK.md`) |
 | 1 | Scaffolding + Capacitor | ✅ | Acceptance tercapai: `next build` → `out/`, `android/` ter-generate, 3 plugin (sqlite 8.1.1, filesystem 8.1.3, share 8.0.1) + core/android/cli, `cap sync` OK, commit ada (lihat `tugas/T01-scaffolding.md`) |
-| 2 | Lapisan DB lokal (SQLite) | 🔄 | sub-task 1/8 ✅ (init DB + DDL; `lib/schema.ts` + `lib/db.ts`; verifikasi 30/30 PASS; build OK) — sisa: seed user, hash, localApi, adaptasi halaman, logika bisnis, hapus fetch |
+| 2 | Lapisan DB lokal (SQLite) | 🔄 | sub-task 1–4,6/8 ✅ (init DB+DDL 30/30 PASS; seed mastaufiq/admin owner; hash 20/20 PASS; localApi lengkap + logika bisnis) — sisa: 5 ganti import halaman, 7 hapus fetch, 8 uji runtime (fase 5) |
 | 3 | Adaptasi modul UI + xlsx/pdf | ⬜ | `tugas/T03-adaptasi-modul.md` |
 | 4 | Seeding + backup/restore | ⬜ | `tugas/T04-seeding-backup.md` |
 | 5 | Build & uji (Android SDK, Gradle) | ⬜ | `tugas/T05-build-gradle.md` |
@@ -35,10 +35,15 @@ Log: `C:\temp\nusantara_t01b.log` · Status: `C:\temp\nusantara_t01_status.txt`
 
 ## Next Action
 
-- Lanjut `tugas/T02-db-lokal.md` → sub-task 2: **seed user default**
-  (`mastaufiq`/`admin`, role owner — sesuai keputusan terkunci #3, BUKAN
-  asumsi `admin`/`admin123` di teks tugas; keputusan STATE.md menang).
-  Sub-task 3 (hash SHA-256(salt+password), salt acak) dikerjakan setelahnya.
+- Lanjut `tugas/T02-db-lokal.md` → sub-task 5: **ganti import di semua
+  halaman: `api` → `localApi`** (6 halaman di app/(app): dashboard, katalog,
+  produk, tambah, penjualan, nota + `lib/session.ts` yang dynamic-import
+  `@/lib/api` utk login → ganti `@/lib/localApi`). Setelah itu sub-task 7:
+  grep `fetch(`, `API_BASE`, `NEXT_PUBLIC_API_URL` → hapus `lib/api.ts` &
+  env yang tak terpakai. Catatan utk sesi baru: `lib/api.ts` TIDAK boleh
+  dihapus sebelum sub-task 5 selesai (masih diimport halaman). Keputusan
+  behavior yang disengaja: low-stock = stock<=stock_min (bukan <10 hardcoded);
+  oversell di-clamp 0 (sama dgn backend lama); subtotal sale direkomputasi.
 - Checkpoint: update STATE + log + git commit di tiap sub-task selesai.
 
 ## Disiplin Checkpoint & Anti-Loop (WAJIB semua sesi)

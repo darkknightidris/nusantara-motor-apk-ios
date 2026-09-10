@@ -23,6 +23,13 @@
 import { Capacitor } from "@capacitor/core";
 import { CapacitorSQLite } from "@capacitor-community/sqlite";
 import { DB_NAME, DB_VERSION, SCHEMA_DDL } from "@/lib/schema";
+import { genSalt, hashPassword } from "@/lib/hash";
+
+// Akun awal (keputusan terkunci 01-SPEK #3): mastaufiq / admin, role owner.
+// (Bukan asumsi admin/admin123 di teks tugas T02 — keputusan STATE.md menang.)
+const SEED_USERNAME = "mastaufiq";
+const SEED_PASSWORD = "admin";
+const SEED_ROLE = "owner";
 
 export { DB_NAME, DB_VERSION };
 
@@ -88,6 +95,23 @@ export function ensureDb(): Promise<void> {
         String(DB_VERSION),
       ]);
     }
+    // Seed user default (01-SPEK #3). Idempoten & self-healing:
+    // di-insert hanya bila username-nya tidak ada (mis. kehapus user).
+    const seeded = await rawQuery(
+      "SELECT id FROM users WHERE username = ?",
+      [SEED_USERNAME]
+    );
+    if (seeded.length === 0) {
+      const salt = genSalt();
+      const hash = await hashPassword(SEED_PASSWORD, salt);
+      await rawRun(
+        "INSERT INTO users (id, username, password_hash, salt, role, created_at) VALUES (?,?,?,?,?,?)",
+        [uuid(), SEED_USERNAME, hash, salt, SEED_ROLE, nowISO()]
+      );
+      await rawRun("INSERT OR REPLACE INTO meta (key, value) VALUES ('seeded_at', ?)", [
+        nowISO(),
+      ]);
+    }
   })();
   ready.catch(() => {
     ready = null; // init gagal → beri kesempatan dicoba lagi
@@ -114,12 +138,16 @@ export async function qRows(
 
 /**
  * `SELECT *` dari `table` yang dipetakan ke Record per nama kolom.
- * `sql` TIDAK boleh memuat parameter — untuk filter pakai qRows.
+ * `sql` harus memilih kolom-kolom dari `table` itu (tanpa join).
  */
-export async function qAll(table: string, sql: string): Promise<Row[]> {
+export async function qAll(
+  table: string,
+  sql: string,
+  params: Param[] = []
+): Promise<Row[]> {
   await ensureDb();
   const cols = await tableColumns(table);
-  const values = await rawQuery(sql);
+  const values = await rawQuery(sql, params);
   return values.map((vals) => {
     const row: Row = {};
     cols.forEach((name, i) => {

@@ -1,0 +1,926 @@
+"use client";
+
+// Lapisan API LOKAL — pengganti lib/api.ts (fetch ke backend FastAPI).
+// SELURUH signature lib/api.ts PWA ditiru apa adanya (nama fungsi + tipe),
+// ditambah endpoint web lama yang tidak ada di api.ts PWA (CRUD
+// transactions+payments, CRUD users, attachment) — sesuai T02.
+//
+// Prinsip:
+// - Tidak ada satu pun panggilan jaringan: semua CRUD langsung ke SQLite
+//   lokal (lib/db.ts), file via @capacitor/filesystem, share via
+//   @capacitor/share, xlsx via SheetJS, pdf via jsPDF.
+// - Logika business yang tadinya di backend dipindah ke sini:
+//   * stock produk berkurang saat sale tersimpan (clamp ≥ 0, sama dgn lama)
+//   * status transaksi di-derive dari paid_amount/total_amount
+//   * validasi payload (nama, qty, harga, total, username, dll.)
+// - Penegakan role sama persis dengan backend lama (owner-only op →
+//   ApiError 403). Akun owner utama (seed) dilindungi dari ubah role /
+//   hapus (padanan backend "admin" = di sini "mastaufiq").
+// - Subtotal sale di-rekomputasi (qty × unit_price) — tidak percaya payload.
+
+import { Capacitor } from "@capacitor/core";
+import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Share } from "@capacitor/share";
+import * as XLSX from "xlsx";
+import { jsPDF } from "jspdf";
+import type {
+  AuthUser,
+  GuidePayload,
+  LoginResponse,
+  Payment,
+  Product,
+  ProductGuide,
+  ProductImportResult,
+  ProductPayload,
+  Role,
+  Sale,
+  SaleItem,
+  SaleItemInput,
+  Transaction,
+  TransactionDetail,
+} from "@/lib/types";
+import { run, qRows, qAll, tx, uuid, nowISO, deriveStatus, type Row } from "@/lib/db";
+import { hashPassword, genSalt } from "@/lib/hash";
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// ——— session (pola sama dgn lib/session.ts: localStorage nm_session) ———
+
+const SESSION_KEY = "***";
+
+interface SessionLocal {
+  token: string | null;
+  user: { id: string; username: string; role: Role } | null;
+}
+
+function getSession(): SessionLocal {
+  if (typeof window === "undefined") return { token: null, user: null };
+  try {
+    const raw = window.localStorage.getItem(SESSION_KEY);
+    if (!raw) return { token: null, user: null };
+    const p = JSON.parse(raw);
+    return { token: p.token ?? null, user: p.user ?? null };
+  } catch {
+    return { token: null, user: null };
+  }
+}
+
+function requireOwner(): void {
+  const s = getSession();
+  if (!s.user || s.user.role !== "owner") {
+    throw new ApiError(403, "Hanya owner yang dapat melakukan aksi ini");
+  }
+}
+
+const SEED_USERNAME = "mastaufiq"; // akun owner utama (dilindungi)
+
+// ——— kolom tabel products (sumber kebenaran urutan INSERT/UPDATE) ———
+
+const PRODUCT_COLS_ARR = [
+  "id",
+  "name",
+  "sku",
+  "category",
+  "brand",
+  "unit",
+  "qty_per_box",
+  "price_modal_pcs",
+  "price_modal_box",
+  "price_grosir_pcs",
+  "price_grosir_box",
+  "price_eceran_pcs",
+  "price_eceran_box",
+  "stock",
+  "stock_min",
+  "kelebihan",
+  "notes",
+] as const;
+const PRODUCT_COLS = PRODUCT_COLS_ARR.join(", ");
+
+// ——— mapping baris DB → tipe domain ———
+
+function s(v: unknown): string | null {
+  return v == null ? null : String(v);
+}
+function n(v: unknown): number {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : 0;
+}
+
+function toProduct(r: Row): Product {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    sku: s(r.sku),
+    category: s(r.category),
+    brand: s(r.brand),
+    unit: String(r.unit),
+    qty_per_box: n(r.qty_per_box),
+    price_modal_pcs: n(r.price_modal_pcs),
+    price_modal_box: n(r.price_modal_box),
+    price_grosir_pcs: n(r.price_grosir_pcs),
+    price_grosir_box: n(r.price_grosir_box),
+    price_eceran_pcs: n(r.price_eceran_pcs),
+    price_eceran_box: n(r.price_eceran_box),
+    stock: n(r.stock),
+    stock_min: n(r.stock_min),
+    kelebihan: s(r.lebihan),
+    notes: s(r.notes),
+  };
+}
+
+function toSaleItem(r: Row): SaleItem {
+  return {
+    id: String(r.id),
+    sale_id: String(r.sale_id),
+    product_id: String(r.product_id),
+    product_name: String(r.product_name),
+    qty: n(r.qty),
+    price_type: String(r.price_type) as SaleItem["price_type"],
+    unit_price: n(r.unit_price),
+    subtotal: n(r.subtotal),
+  };
+}
+
+function toSaleOf(r: Row): Sale {
+  return {
+    id: String(r.id),
+    customer_name: s(r.customer_name),
+    customer_contact: s(r.customer_contact),
+    notes: s(r.notes),
+    total_amount: n(r.total_amount),
+    created_at: s(r.created_at) ?? "",
+  };
+}
+
+function toTransaction(r: Row): Transaction {
+  return {
+    id: String(r.id),
+    type: String(r.type) as Transaction["type"],
+    party_name: String(r.party_name),
+    party_contact: s(r.party_contact),
+    description: s(r.description),
+    total_amount: n(r.total_amount),
+    paid_amount: n(r.paid_amount),
+    status: (s(r.status) ?? "belum_lunas") as Transaction["status"],
+    due_date: s(r.due_date),
+    notes: s(r.notes),
+    created_at: s(r.created_at) ?? "",
+  };
+}
+
+function toAttachment(r: Row) {
+  return {
+    id: String(r.id),
+    transaction_id: s(r.transaction_id) ?? "",
+    file_name: String(r.file_name),
+    file_url: String(r.file_url),
+    file_type: s(r.file_type) ?? "application/octet-stream",
+    uploaded_at: s(r.uploaded_at) ?? "",
+  };
+}
+
+// URL file yang bisa dipakai langsung oleh <img>/<a> di WebView.
+function toDisplayUrl(path: string | null): string {
+  if (!path) return "";
+  if (/^(https?:|capacitor:|file:)/.test(path)) return path;
+  return Capacitor.convertFileSrc(path);
+}
+
+// ——— ekspor file: SheetJS/jsPDF → Filesystem → Share ———
+
+async function exportFileToShare(
+  name: string,
+  bytes: ArrayBuffer | Uint8Array,
+  mime: string
+): Promise<void> {
+  const data = new Uint8Array(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
+  const path = `nm-export/${name}-${Date.now()}`;
+  const written = await Filesystem.writeFile({
+    path,
+    data: new Blob([data]),
+    directory: Directory.Documents,
+  });
+  await Share.share({
+    files: [written.uri ?? Capacitor.convertFileSrc(path)],
+  });
+}
+
+function xlsxToBytes(wb: XLSX.WorkBook): ArrayBuffer {
+  return XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+}
+
+function aoaSheet(
+  wb: XLSX.WorkBook,
+  title: string,
+  header: string[],
+  rows: (string | number)[][]
+) {
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws["!cols"] = header.map((h) => ({ wch: Math.max(14, h.length + 2) }));
+  XLSX.utils.book_append_sheet(wb, ws, title);
+}
+
+function fmtRp(v: number): string {
+  return "Rp " + Math.round(v).toLocaleString("id-ID");
+}
+
+// ——— validasi payload (tandingan Pydantic di backend lama) ———
+
+function validateProductPayload(p: ProductPayload): void {
+  if (!p.name || !String(p.name).trim()) throw new ApiError(400, "Nama produk wajib diisi");
+  if (!p.unit || !String(p.unit).trim()) throw new ApiError(400, "Satuan wajib diisi");
+  if (!Number.isInteger(p.qty_per_box) || p.qty_per_box < 1) {
+    throw new ApiError(400, "Isi per dus harus bilangan bulat ≥ 1");
+  }
+  const harga: [string, number | undefined | null][] = [
+    ["price_modal_pcs", p.price_modal_pcs],
+    ["price_modal_box", p.price_modal_box],
+    ["price_grosir_pcs", p.price_grosir_pcs],
+    ["price_grosir_box", p.price_grosir_box],
+    ["price_eceran_pcs", p.price_eceran_pcs],
+    ["price_eceran_box", p.price_eceran_box],
+  ];
+  for (const [k, v] of harga) {
+    if (v == null || !Number.isFinite(v) || v < 0) throw new ApiError(400, `Harga ${k} harus angka ≥ 0`);
+  }
+  if (!Number.isInteger(p.stock) || p.stock < 0) throw new ApiError(400, "Stok harus bilangan bulat ≥ 0");
+  if (!Number.isInteger(p.stock_min) || p.stock_min < 0) throw new ApiError(400, "Stok min harus bilangan bulat ≥ 0");
+}
+
+function payloadFields(p: ProductPayload) {
+  return [
+    p.name,
+    p.sku ?? null,
+    p.category ?? null,
+    p.brand ?? null,
+    p.unit,
+    p.qty_per_box,
+    p.price_modal_pcs,
+    p.price_modal_box,
+    p.price_grosir_pcs,
+    p.price_grosir_box,
+    p.price_eceran_pcs,
+    p.price_eceran_box,
+    p.stock,
+    p.stock_min,
+    p.kelebihan ?? null,
+    p.notes ?? null,
+  ];
+}
+
+// ——— import xlsx (format kolom sama dgn backend lama, 15 kolom) ———
+
+function num(v: unknown, d = 0): number {
+  if (v == null || v === "") return d;
+  const x = Number(v);
+  return Number.isFinite(x) ? x : d;
+}
+function intv(v: unknown, d = 0): number {
+  return Math.trunc(num(v, d));
+}
+
+async function doImportProductsExcel(file: File): Promise<ProductImportResult> {
+  if (!/\.(xlsx|xls)$/i.test(file.name)) {
+    throw new ApiError(400, "File harus berformat .xlsx");
+  }
+  const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = (XLSX.utils.sheet_to_json(ws, { header: 1, defval: null }) as unknown[][]).slice(1);
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+  const errors: string[] = [];
+  const updCols = PRODUCT_COLS_ARR.slice(1);
+  await tx(async () => {
+    for (let i = 0; i < rows.length; i++) {
+      const raw = rows[i] ?? [];
+      const row = [...raw, ...new Array(15).fill(null)];
+      if (!row[0]) continue;
+      const rowNum = i + 2; // baris 1 = header
+      try {
+        const name = String(row[0]).trim();
+        const payload: ProductPayload = {
+          name,
+          sku: row[1] ? String(row[1]).trim() : null,
+          category: row[2] ? String(row[2]).trim() : null,
+          brand: row[3] ? String(row[3]).trim() : null,
+          unit: row[4] ? String(row[4]).trim() : "pcs",
+          qty_per_box: intv(row[5], 1),
+          price_modal_pcs: num(row[6]),
+          price_modal_box: num(row[7]),
+          price_grosir_pcs: num(row[8]),
+          price_grosir_box: num(row[9]),
+          price_eceran_pcs: num(row[10]),
+          price_eceran_box: num(row[11]),
+          stock: intv(row[12], 0),
+          stock_min: intv(row[13], 5),
+          kelebihan: null,
+          notes: row[14] ? String(row[14]).trim() : null,
+        };
+        const existing = (await qAll("products", "SELECT * FROM products WHERE name = ?", [name]))[0];
+        if (existing) {
+          await run(
+            `UPDATE products SET ${updCols.map((c) => `${c} = ?`).join(", ")} WHERE id = ?`,
+            [...payloadFields(payload), existing.id]
+          );
+          updated++;
+        } else {
+          await run(
+            `INSERT INTO products (${PRODUCT_COLS}) VALUES (${PRODUCT_COLS_ARR.map(() => "?").join(", ")})`,
+            [uuid(), ...payloadFields(payload)]
+          );
+          inserted++;
+        }
+      } catch (e) {
+        skipped++;
+        errors.push(`Baris ${rowNum}: ${String(e).slice(0, 50)}`);
+      }
+    }
+  });
+  return { inserted, updated, skipped, errors: errors.slice(0, 5) };
+}
+
+// ——— API lokal ———
+
+export const localApi = {
+  // ===== Auth =====
+  login: async (username: string, password: string): Promise<LoginResponse> => {
+    const u = (await qAll("users", "SELECT * FROM users WHERE username = ?", [username]))[0];
+    if (!u) throw new ApiError(401, "Username atau password salah");
+    const hash = await hashPassword(password, String(u.salt));
+    if (hash !== String(u.password_hash)) throw new ApiError(401, "Username atau password salah");
+    return { token: `local-${u.id}`, username: String(u.username), role: u.role as Role };
+  },
+
+  me: async (): Promise<AuthUser> => {
+    const sess = getSession();
+    if (!sess.user) throw new ApiError(401, "Belum login");
+    const u = (await qAll("users", "SELECT * FROM users WHERE username = ?", [sess.user.username]))[0];
+    if (!u) throw new ApiError(401, "User tidak ditemukan di database");
+    return { id: String(u.id), username: String(u.username), role: u.role as Role };
+  },
+
+  // ===== Products =====
+  listProducts: async (params?: { search?: string; category?: string; brand?: string }): Promise<Product[]> => {
+    const where: string[] = [];
+    const p: (string | number | null)[] = [];
+    if (params?.search) {
+      where.push("name LIKE ?");
+      p.push(`%${params.search}%`);
+    }
+    if (params?.category) {
+      where.push("category = ?");
+      p.push(params.category);
+    }
+    if (params?.brand) {
+      where.push("brand = ?");
+      p.push(params.brand);
+    }
+    const sql = `SELECT * FROM products ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY name COLLATE NOCASE`;
+    return (await qAll("products", sql, p)).map(toProduct);
+  },
+
+  getProduct: async (id: string): Promise<Product> => {
+    const r = (await qAll("products", "SELECT * FROM products WHERE id = ?", [id]))[0];
+    if (!r) throw new ApiError(404, "Produk tidak ditemukan");
+    return toProduct(r);
+  },
+
+  createProduct: async (payload: ProductPayload): Promise<Product> => {
+    requireOwner();
+    validateProductPayload(payload);
+    const id = uuid();
+    await run(
+      `INSERT INTO products (${PRODUCT_COLS}) VALUES (${PRODUCT_COLS_ARR.map(() => "?").join(", ")})`,
+      [id, ...payloadFields(payload)]
+    );
+    return toProduct((await qAll("products", "SELECT * FROM products WHERE id = ?", [id]))[0]);
+  },
+
+  updateProduct: async (id: string, payload: ProductPayload): Promise<Product> => {
+    requireOwner();
+    validateProductPayload(payload);
+    const old = (await qAll("products", "SELECT * FROM products WHERE id = ?", [id]))[0];
+    if (!old) throw new ApiError(404, "Produk tidak ditemukan");
+    await run(
+      `UPDATE products SET ${PRODUCT_COLS_ARR.slice(1).map((c) => `${c} = ?`).join(", ")} WHERE id = ?`,
+      [...payloadFields(payload), id]
+    );
+    return toProduct((await qAll("products", "SELECT * FROM products WHERE id = ?", [id]))[0]);
+  },
+
+  deleteProduct: async (id: string): Promise<void> => {
+    requireOwner();
+    const old = (await qAll("products", "SELECT * FROM products WHERE id = ?", [id]))[0];
+    if (!old) throw new ApiError(404, "Produk tidak ditemukan");
+    // FK cascade: sale_items & guides ikut terhapus.
+    await run("DELETE FROM products WHERE id = ?", [id]);
+  },
+
+  getCategories: async (): Promise<string[]> => {
+    const rows = await qRows("SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category");
+    return rows.map((r) => String(r[0]));
+  },
+
+  getBrands: async (): Promise<string[]> => {
+    const rows = await qRows("SELECT DISTINCT brand FROM products WHERE brand IS NOT NULL ORDER BY brand");
+    return rows.map((r) => String(r[0]));
+  },
+
+  getLowStock: async (): Promise<Product[]> => {
+    // Ambang low-stock memakai kolom stock_min (04-SCHEMA-DB) — perbaikan
+    // dari hardcoded stock<10 di backend lama.
+    const rows = await qAll(
+      "products",
+      "SELECT * FROM products WHERE stock <= stock_min ORDER BY stock, name COLLATE NOCASE"
+    );
+    return rows.map(toProduct);
+  },
+
+  // ===== Export/import katalog =====
+  exportProductsExcel: async (): Promise<void> => {
+    const products = (await localApi.listProducts()).map((p) => [
+      p.name,
+      p.sku ?? "",
+      p.category ?? "",
+      p.brand ?? "",
+      p.unit,
+      p.qty_per_box,
+      p.price_modal_pcs,
+      p.price_modal_box,
+      p.price_grosir_pcs,
+      p.price_grosir_box,
+      p.price_eceran_pcs,
+      p.price_eceran_box,
+      p.stock,
+      p.stock_min,
+      p.notes ?? "",
+    ]);
+    const wb = XLSX.utils.book_new();
+    aoaSheet(
+      wb,
+      "Katalog Produk",
+      ["Nama Produk", "SKU", "Kategori", "Brand", "Satuan", "Isi/Dus", "Modal/pcs", "Modal/dus", "Grosir/pcs", "Grosir/dus", "Eceran/pcs", "Eceran/dus", "Stok", "Stok Min", "Catatan"],
+      products
+    );
+    await exportFileToShare("katalog-produk.xlsx", xlsxToBytes(wb), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  },
+
+  exportProductsPdf: async (): Promise<void> => {
+    const products = await localApi.listProducts();
+    const doc = new jsPDF({ orientation: "landscape", unit: "cm", format: "a4" });
+    doc.setFontSize(14);
+    doc.text("Katalog Harga Produk - Nusantara Motor", 1.5, 1.5);
+    const cols = [
+      { h: "Nama Produk", x: 1.5, align: "left" as const },
+      { h: "Kategori", x: 8.0, align: "left" as const },
+      { h: "Brand", x: 11.0, align: "left" as const },
+      { h: "Satuan", x: 14.0, align: "left" as const },
+      { h: "Modal/pcs", x: 16.0, align: "right" as const },
+      { h: "Grosir/pcs", x: 19.6, align: "right" as const },
+      { h: "Eceran/pcs", x: 23.2, align: "right" as const },
+      { h: "Stok", x: 26.8, align: "right" as const },
+    ];
+    doc.setFont("helvetica", "bold");
+    let y = 2.8;
+    for (const c of cols) doc.text(c.h, c.x, y, c.align === "right" ? { align: "right" } : undefined);
+    y += 0.5;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(1.5, y, 28.2, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    for (const p of products) {
+      if (y > 18) {
+        doc.addPage();
+        y = 2;
+      }
+      const row = [
+        p.name,
+        p.category ?? "-",
+        p.brand ?? "-",
+        p.unit,
+        fmtRp(p.price_modal_pcs),
+        fmtRp(p.price_grosir_pcs),
+        fmtRp(p.price_eceran_pcs),
+        String(p.stock),
+      ];
+      cols.forEach((c, i) => doc.text(String(row[i]), c.x, y, c.align === "right" ? { align: "right" } : undefined));
+      y += 0.7;
+    }
+    const out = doc.output("arraybuffer");
+    await exportFileToShare("katalog-harga.pdf", out, "application/pdf");
+  },
+
+  importProductsExcel: async (file: File): Promise<ProductImportResult> => {
+    requireOwner();
+    return doImportProductsExcel(file);
+  },
+
+  // ===== Guides =====
+  getGuidesByProduct: async (productId: string): Promise<ProductGuide[]> => {
+    const rows = await qRows(
+      `SELECT g.id, g.product_id, g.vehicle_brand, g.vehicle_model, g.vehicle_year, g.vehicle_cc, g.notes,
+              p.name, p.brand, p.category
+       FROM guides g LEFT JOIN products p ON p.id = g.product_id
+       WHERE g.product_id = ? ORDER BY g.vehicle_brand`,
+      [productId]
+    );
+    return rows.map(
+      (r): ProductGuide => ({
+        id: String(r[0]),
+        product_id: String(r[1]),
+        vehicle_brand: String(r[2]),
+        vehicle_model: String(r[3]),
+        vehicle_year: s(r[4]),
+        vehicle_cc: s(r[5]),
+        notes: s(r[6]),
+        products: r[7] != null ? { name: String(r[7]), brand: s(r[8]), category: s(r[9]) } : null,
+      })
+    );
+  },
+
+  createGuide: async (payload: { product_id: string } & GuidePayload): Promise<ProductGuide> => {
+    requireOwner();
+    const p = (await qAll("products", "SELECT * FROM products WHERE id = ?", [payload.product_id]))[0];
+    if (!p) throw new ApiError(404, "Produk tidak ditemukan");
+    if (!payload.vehicle_brand || !payload.vehicle_model) {
+      throw new ApiError(400, "Brand & model kendaraan wajib diisi");
+    }
+    const id = uuid();
+    await run(
+      "INSERT INTO guides (id, product_id, vehicle_brand, vehicle_model, vehicle_year, vehicle_cc, notes) VALUES (?,?,?,?,?,?,?)",
+      [id, payload.product_id, payload.vehicle_brand, payload.vehicle_model, payload.vehicle_year ?? null, payload.vehicle_cc ?? null, payload.notes ?? null]
+    );
+    return toGuideRow((await qAll("guides", "SELECT * FROM guides WHERE id = ?", [id]))[0]);
+  },
+
+  updateGuide: async (guideId: string, payload: GuidePayload): Promise<ProductGuide> => {
+    requireOwner();
+    const old = (await qAll("guides", "SELECT * FROM guides WHERE id = ?", [guideId]))[0];
+    if (!old) throw new ApiError(404, "Panduan tidak ditemukan");
+    await run(
+      "UPDATE guides SET vehicle_brand = ?, vehicle_model = ?, vehicle_year = ?, vehicle_cc = ?, notes = ? WHERE id = ?",
+      [payload.vehicle_brand, payload.vehicle_model, payload.vehicle_year ?? null, payload.vehicle_cc ?? null, payload.notes ?? null, guideId]
+    );
+    return toGuideRow((await qAll("guides", "SELECT * FROM guides WHERE id = ?", [guideId]))[0]);
+  },
+
+  deleteGuide: async (guideId: string): Promise<void> => {
+    requireOwner();
+    const old = (await qAll("guides", "SELECT * FROM guides WHERE id = ?", [guideId]))[0];
+    if (!old) throw new ApiError(404, "Panduan tidak ditemukan");
+    await run("DELETE FROM guides WHERE id = ?", [guideId]);
+  },
+
+  // ===== Sales =====
+  listSales: async (): Promise<Sale[]> => {
+    const sales = await qAll("sales", "SELECT * FROM sales ORDER BY created_at DESC");
+    const ids = sales.map((x) => String(x.id));
+    const bySale = new Map<string, SaleItem[]>();
+    if (ids.length > 0) {
+      const ph = ids.map(() => "?").join(",");
+      const items = await qAll("sale_items", `SELECT * FROM sale_items WHERE sale_id IN (${ph})`, ids);
+      for (const it of items) {
+        const key = String(it.sale_id);
+        const list = bySale.get(key) ?? [];
+        list.push(toSaleItem(it));
+        bySale.set(key, list);
+      }
+    }
+    return sales.map((x) => ({ ...toSaleOf(x), items: bySale.get(String(x.id)) ?? [] }));
+  },
+
+  getSale: async (id: string): Promise<Sale> => {
+    const sale = (await qAll("sales", "SELECT * FROM sales WHERE id = ?", [id]))[0];
+    if (!sale) throw new ApiError(404, "Tidak ditemukan");
+    const items = (await qAll("sale_items", "SELECT * FROM sale_items WHERE sale_id = ?", [id])).map(toSaleItem);
+    return { ...toSaleOf(sale), items };
+  },
+
+  createSale: async (payload: {
+    customer_name?: string | null;
+    customer_contact?: string | null;
+    notes?: string | null;
+    items: SaleItemInput[];
+  }): Promise<Sale> => {
+    if (!payload.items || payload.items.length === 0) {
+      throw new ApiError(400, "Minimal 1 item penjualan");
+    }
+    // Validasi & rekomputasi subtotal + hitung stok (logika backend → klien).
+    const products = await localApi.listProducts();
+    const byId = new Map(products.map((p) => [p.id, p]));
+    const validated: (SaleItemInput & { product: Product })[] = [];
+    for (const it of payload.items) {
+      if (!Number.isInteger(it.qty) || it.qty < 1) throw new ApiError(400, "Qty harus bilangan bulat ≥ 1");
+      if (it.unit_price < 0 || !Number.isFinite(it.unit_price)) throw new ApiError(400, "Harga tidak boleh negatif");
+      if (it.price_type !== "modal" && it.price_type !== "grosir" && it.price_type !== "eceran") {
+        throw new ApiError(400, "Jenis harga tidak valid");
+      }
+      const product = byId.get(it.product_id);
+      if (!product) throw new ApiError(404, "Produk tidak ditemukan");
+      validated.push({ ...it, subtotal: it.qty * it.unit_price, product });
+    }
+    const total = validated.reduce((sum, it) => sum + it.subtotal, 0);
+    const id = uuid();
+    const now = nowISO();
+    await tx(async () => {
+      await run(
+        "INSERT INTO sales (id, customer_name, customer_contact, notes, total_amount, created_at) VALUES (?,?,?,?,?,?)",
+        [id, payload.customer_name ?? null, payload.customer_contact ?? null, payload.notes ?? null, total, now]
+      );
+      for (const it of validated) {
+        await run(
+          "INSERT INTO sale_items (id, sale_id, product_id, product_name, qty, price_type, unit_price, subtotal) VALUES (?,?,?,?,?,?,?,?)",
+          [uuid(), id, it.product_id, it.product_name, it.qty, it.price_type, it.unit_price, it.subtotal]
+        );
+        // Stok berkurang (clamp ≥ 0 — perilaku sama dgn backend lama).
+        const newStock = Math.max(0, it.product.stock - it.qty);
+        if (newStock !== it.product.stock) {
+          await run("UPDATE products SET stock = ? WHERE id = ?", [newStock, it.product.id]);
+        }
+      }
+    });
+    return localApi.getSale(id);
+  },
+
+  deleteSale: async (id: string): Promise<{ message: string }> => {
+    const old = (await qAll("sales", "SELECT * FROM sales WHERE id = ?", [id]))[0];
+    if (!old) throw new ApiError(404, "Tidak ditemukan");
+    // Sama dgn backend lama: stok TIDAK dikembalikan saat sale dihapus.
+    await run("DELETE FROM sales WHERE id = ?", [id]);
+    return { message: "Penjualan berhasil dihapus" };
+  },
+
+  exportSalesExcel: async (): Promise<void> => {
+    const sales = await localApi.listSales();
+    const rows = sales.map((s2) => [
+      String(s2.created_at).slice(0, 10),
+      s2.customer_name || "Umum",
+      s2.customer_contact ?? "",
+      s2.total_amount,
+      s2.notes ?? "",
+    ]);
+    const wb = XLSX.utils.book_new();
+    aoaSheet(wb, "Riwayat Penjualan", ["Tanggal", "Customer", "Kontak", "Total", "Catatan"], rows);
+    await exportFileToShare("riwayat-penjualan.xlsx", xlsxToBytes(wb), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  },
+
+  // ===== Transactions (hutang/piutang) =====
+  listTransactions: async (type?: string, status?: string): Promise<Transaction[]> => {
+    const where: string[] = [];
+    const p: (string | number | null)[] = [];
+    if (type) {
+      where.push("type = ?");
+      p.push(type);
+    }
+    if (status) {
+      where.push("status = ?");
+      p.push(status);
+    }
+    const sql = `SELECT * FROM transactions ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY created_at DESC`;
+    return (await qAll("transactions", sql, p)).map(toTransaction);
+  },
+
+  getTransactionSummary: async (): Promise<{ hutang: number; piutang: number }> => {
+    const rows = (await qAll("transactions", "SELECT * FROM transactions WHERE status = 'belum_lunas'")).map(toTransaction);
+    return {
+      hutang: rows.filter((t) => t.type === "hutang").reduce((sum, t) => sum + (t.total_amount - t.paid_amount), 0),
+      piutang: rows.filter((t) => t.type === "piutang").reduce((sum, t) => sum + (t.total_amount - t.paid_amount), 0),
+    };
+  },
+
+  getTransactionDetail: async (id: string): Promise<TransactionDetail> => {
+    const t = (await qAll("transactions", "SELECT * FROM transactions WHERE id = ?", [id]))[0];
+    if (!t) throw new ApiError(404, "Transaksi tidak ditemukan");
+    const payments: Payment[] = (await qAll("payments", "SELECT * FROM payments WHERE transaction_id = ? ORDER BY paid_at", [id])).map((p2) => ({
+      id: String(p2.id),
+      transaction_id: String(p2.transaction_id),
+      amount: n(p2.amount),
+      notes: s(p2.notes),
+      paid_at: s(p2.paid_at) ?? "",
+    }));
+    return { ...toTransaction(t), payments };
+  },
+
+  createTransaction: async (payload: {
+    type: string;
+    party_name: string;
+    party_contact?: string | null;
+    description?: string | null;
+    total_amount: number;
+    due_date?: string | null;
+    notes?: string | null;
+  }): Promise<Transaction> => {
+    if (payload.type !== "hutang" && payload.type !== "piutang") {
+      throw new ApiError(400, "Jenis transaksi tidak valid");
+    }
+    if (!payload.party_name || !String(payload.party_name).trim()) {
+      throw new ApiError(400, "Nama wajib diisi");
+    }
+    if (!Number.isFinite(payload.total_amount) || payload.total_amount <= 0) {
+      throw new ApiError(400, "Total amount wajib diisi dan lebih dari 0");
+    }
+    const id = uuid();
+    const now = nowISO();
+    const total = payload.total_amount;
+    await run(
+      "INSERT INTO transactions (id, type, party_name, party_contact, description, total_amount, paid_amount, status, due_date, notes, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+      [id, payload.type, payload.party_name, payload.party_contact ?? null, payload.description ?? null, total, 0, deriveStatus(0, total), payload.due_date ?? null, payload.notes ?? null, now]
+    );
+    return toTransaction((await qAll("transactions", "SELECT * FROM transactions WHERE id = ?", [id]))[0]);
+  },
+
+  payTransaction: async (payload: {
+    transaction_id: string;
+    amount: number;
+    notes?: string | null;
+  }): Promise<{ message: string; status: "lunas" | "belum_lunas" }> => {
+    if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
+      throw new ApiError(400, "Jumlah pembayaran harus lebih dari 0");
+    }
+    const t = (await qAll("transactions", "SELECT * FROM transactions WHERE id = ?", [payload.transaction_id]))[0];
+    if (!t) throw new ApiError(404, "Transaksi tidak ditemukan");
+    const total = n(t.total_amount);
+    const paid = n(t.paid_amount);
+    const remaining = total - paid;
+    if (payload.amount > remaining + 1e-9) {
+      throw new ApiError(400, `Pembayaran melebihi sisa tagihan (${remaining})`);
+    }
+    const newPaid = paid + payload.amount;
+    const newStatus = deriveStatus(newPaid, total);
+    await tx(async () => {
+      await run("INSERT INTO payments (id, transaction_id, amount, notes, paid_at) VALUES (?,?,?,?,?)", [
+        uuid(),
+        payload.transaction_id,
+        payload.amount,
+        payload.notes ?? null,
+        nowISO(),
+      ]);
+      await run("UPDATE transactions SET paid_amount = ?, status = ? WHERE id = ?", [newPaid, newStatus, payload.transaction_id]);
+    });
+    return { message: "Pembayaran berhasil dicatat", status: newStatus };
+  },
+
+  deleteTransaction: async (id: string): Promise<{ message: string }> => {
+    requireOwner();
+    const old = (await qAll("transactions", "SELECT * FROM transactions WHERE id = ?", [id]))[0];
+    if (!old) throw new ApiError(404, "Transaksi tidak ditemukan");
+    await run("DELETE FROM transactions WHERE id = ?", [id]); // payments ikut (cascade)
+    return { message: "Transaksi berhasil dihapus" };
+  },
+
+  exportTransactionsExcel: async (): Promise<void> => {
+    const rows = (await localApi.listTransactions()).map((t) => [
+      t.type === "hutang" ? "Hutang" : "Piutang",
+      t.party_name,
+      t.party_contact ?? "",
+      t.description ?? "",
+      t.total_amount,
+      t.paid_amount,
+      t.total_amount - t.paid_amount,
+      t.status === "lunas" ? "Lunas" : "Belum Lunas",
+      t.due_date ?? "",
+      String(t.created_at).slice(0, 10),
+    ]);
+    const wb = XLSX.utils.book_new();
+    aoaSheet(
+      wb,
+      "Laporan Keuangan",
+      ["Jenis", "Nama", "Kontak", "Keterangan", "Total", "Sudah Bayar", "Sisa", "Status", "Jatuh Tempo", "Tanggal"],
+      rows
+    );
+    await exportFileToShare("laporan-keuangan.xlsx", xlsxToBytes(wb), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  },
+
+  // ===== Users (owner-only) =====
+  listUsers: async () => {
+    requireOwner();
+    const rows = await qRows("SELECT id, username, role, created_at FROM users ORDER BY created_at");
+    return rows.map((r) => ({ id: String(r[0]), username: String(r[1]), role: r[2] as Role, created_at: s(r[3]) ?? "" }));
+  },
+
+  createUser: async (payload: { username: string; password: string; role: Role }): Promise<{ message: string }> => {
+    requireOwner();
+    const username = String(payload.username).trim();
+    if (!username) throw new ApiError(400, "Username wajib diisi");
+    if (String(payload.password).length < 6) throw new ApiError(400, "Password minimal 6 karakter");
+    if (payload.role !== "owner" && payload.role !== "kasir") throw new ApiError(400, "Role tidak valid");
+    const dup = (await qAll("users", "SELECT id FROM users WHERE username = ?", [username]))[0];
+    if (dup) throw new ApiError(400, "Username sudah dipakai");
+    const salt = genSalt();
+    const hash = await hashPassword(payload.password, salt);
+    await run("INSERT INTO users (id, username, password_hash, salt, role, created_at) VALUES (?,?,?,?,?,?)", [
+      uuid(),
+      username,
+      hash,
+      salt,
+      payload.role,
+      nowISO(),
+    ]);
+    return { message: `User ${username} berhasil dibuat` };
+  },
+
+  updateUser: async (
+    id: string,
+    payload: { role?: Role | null; password?: string | null }
+  ): Promise<{ message: string }> => {
+    requireOwner();
+    const target = (await qAll("users", "SELECT * FROM users WHERE id = ?", [id]))[0];
+    if (!target) throw new ApiError(404, "User tidak ditemukan");
+    if (String(target.username) === SEED_USERNAME && payload.role && payload.role !== "owner") {
+      throw new ApiError(400, "Tidak bisa ubah role akun owner utama");
+    }
+    if (payload.role) {
+      if (payload.role !== "owner" && payload.role !== "kasir") throw new ApiError(400, "Role tidak valid");
+      await run("UPDATE users SET role = ? WHERE id = ?", [payload.role, id]);
+    }
+    if (payload.password) {
+      if (String(payload.password).length < 6) throw new ApiError(400, "Password minimal 6 karakter");
+      const salt = genSalt();
+      const hash = await hashPassword(payload.password, salt);
+      await run("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?", [hash, salt, id]);
+    }
+    return { message: "User berhasil diupdate" };
+  },
+
+  deleteUser: async (id: string): Promise<{ message: string }> => {
+    requireOwner();
+    const target = (await qAll("users", "SELECT * FROM users WHERE id = ?", [id]))[0];
+    if (!target) throw new ApiError(404, "User tidak ditemukan");
+    if (String(target.username) === SEED_USERNAME) {
+      throw new ApiError(400, "Tidak bisa hapus akun owner utama");
+    }
+    await run("DELETE FROM users WHERE id = ?", [id]);
+    return { message: "User berhasil dihapus" };
+  },
+
+  // ===== Attachment (Filesystem lokal, bukan cloud) =====
+  listAttachments: async (transactionId: string) => {
+    const rows = await qAll(
+      "attachments",
+      "SELECT * FROM attachments WHERE transaction_id = ? ORDER BY uploaded_at DESC",
+      [transactionId]
+    );
+    return rows.map((r) => toAttachment({ ...r, file_url: toDisplayUrl(s(r.file_path)) }));
+  },
+
+  uploadAttachment: async (transactionId: string, file: File) => {
+    const t = (await qAll("transactions", "SELECT id FROM transactions WHERE id = ?", [transactionId]))[0];
+    if (!t) throw new ApiError(404, "Transaksi tidak ditemukan");
+    const ext = file.name.includes(".") ? (file.name.split(".").pop() as string) : "bin";
+    const path = `nm-attachments/${transactionId}/${uuid()}.${ext}`;
+    const data = new Uint8Array(await file.arrayBuffer());
+    const written = await Filesystem.writeFile({ path, data: new Blob([data]), directory: Directory.Documents });
+    const uri = written.uri ?? Capacitor.convertFileSrc(path);
+    const id = uuid();
+    const now = nowISO();
+    await run(
+      "INSERT INTO attachments (id, transaction_id, file_name, file_path, file_type, uploaded_at) VALUES (?,?,?,?,?,?)",
+      [id, transactionId, file.name, path, file.type || "application/octet-stream", now]
+    );
+    return toAttachment({
+      id,
+      transaction_id: transactionId,
+      file_name: file.name,
+      file_path: path,
+      file_url: uri,
+      file_type: file.type || "application/octet-stream",
+      uploaded_at: now,
+    });
+  },
+
+  deleteAttachment: async (attachmentId: string): Promise<{ message: string }> => {
+    const att = (await qAll("attachments", "SELECT * FROM attachments WHERE id = ?", [attachmentId]))[0];
+    if (!att) throw new ApiError(404, "Tidak ditemukan");
+    const path = s(att.file_path);
+    if (path) {
+      try {
+        await Filesystem.deleteFile({ path, directory: Directory.Documents });
+      } catch {
+        // file mungkin sudah hilang — biarkan, hapus baris DB tetap jalan
+      }
+    }
+    await run("DELETE FROM attachments WHERE id = ?", [attachmentId]);
+    return { message: "File berhasil dihapus" };
+  },
+};
+
+function toGuideRow(r: Row): ProductGuide {
+  return {
+    id: String(r.id),
+    product_id: String(r.product_id),
+    vehicle_brand: String(r.vehicle_brand),
+    vehicle_model: String(r.vehicle_model),
+    vehicle_year: s(r.vehicle_year),
+    vehicle_cc: s(r.vehicle_cc),
+    notes: s(r.notes),
+    products: null,
+  };
+}
