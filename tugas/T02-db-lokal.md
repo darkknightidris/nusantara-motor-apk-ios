@@ -1,13 +1,22 @@
 # T02 — Lapisan DB Lokal (SQLite)
 
-Status: ⬜ belum mulai
+Status: 🔄 berjalan — sub-task 1/8 selesai
 
 ## Tujuan
 `lib/db.ts` + `lib/localApi.ts` siap dipakai semua modul; auth lokal jalan.
 
 ## Langkah
-- [ ] Inisialisasi DB (file di app data dir) + `CREATE TABLE IF NOT EXISTS`
+- [x] Inisialisasi DB (file di app data dir) + `CREATE TABLE IF NOT EXISTS`
       sesuai `04-SCHEMA-DB.md`
+      ✅ (2026-09-10, sesi 4): `lib/schema.ts` (DDL murni data, 9 tabel + 9 indeks,
+      sesuai 04-SCHEMA-DB.md) + `lib/db.ts` (ensureDb: open → PRAGMA
+      foreign_keys → batch DDL idempoten → meta.db_version; helper run/qRows/
+      qAll/tx/uuid/nowISO/deriveStatus; transaksi native begin/commit/rollback).
+      Verifikasi: `node scripts/verify-schema.mjs` = 30/30 PASS (DDL, tabel,
+      indeks, FK cascade, CHECK constraint, UNIQUE, CRUD, meta). `tsc --noEmit`
+      bersih, `next build` OK (12 halaman). Catatan: API plugin v8 =
+      options-object (`CapacitorSQLite.open/run/query/execute`, instance
+      singleton — BUKAN class + connect()). Verifikasi runtime (WebView) → fase 5.
 - [ ] Seed user default (sesuai jawaban #3; asumsi `admin`/`admin123`, role owner)
 - [ ] Implementasi hash: SHA-256(salt+password), salt acak per user
 - [ ] `lib/localApi.ts`: tiru SELURUH signature `lib/api.ts` PWA
