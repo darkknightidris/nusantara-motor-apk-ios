@@ -5,8 +5,15 @@
 // (v8: API options-object, `CapacitorSQLite` = instance singleton).
 // Tidak ada satu pun panggilan jaringan.
 //
+// LIFECYCLE v8 (connection-based, terverifikasi dari native Java plugin):
+//   createConnection → open → query/run → begin/commit/rollback →
+//   close → closeConnection
+// Tiap method native lookup koneksi di registry `dbDict`; bila koneksi
+// tak terdaftar, native melempang "No available connection". Koneksi
+// HARUS didaftarkan via `createConnection` SEBELUM `open`.
+//
 // Pola: ensureDb() lazy + singleton per sesi webview. Init sekali &
-// idempoten: open (re-open aman) → PRAGMA foreign_keys →
+// idempoten: createConnection → open → PRAGMA foreign_keys →
 // CREATE TABLE IF NOT EXISTS (batch) → cek/set meta.db_version
 // (strategi migrasi, 04-SCHEMA-DB.md).
 //
@@ -68,26 +75,21 @@ const tableCols = new Map<string, string[]>();
 
 /**
  * Inisialisasi DB (idempoten, aman dipanggil berulang).
- * open → PRAGMA foreign_keys → DDL → meta.db_version.
+ * createConnection → open → PRAGMA foreign_keys → DDL →
+ * meta.db_version. Koneksi didaftarkan SELESAI dulu (createConnection)
+ * lalu dibuka (open) — pola v8 connection-based.
  */
-/**
- * Tutup koneksi DB (dipakai restore backup: close → ganti isi → open).
- * Setelah ini ensureDb() akan menginisialisasi ulang dari nol.
- */
-export async function closeDb(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
-  try {
-    await CapacitorSQLite.close({ database: DB });
-  } catch {
-    // koneksi mungkin sudah tertutup — abaikan.
-  }
-  ready = null;
-}
-
 export function ensureDb(): Promise<void> {
   if (ready) return ready;
   ready = (async () => {
     nativeGuard();
+    // createConnection mendaftarkan koneksi di registry native (dbDict).
+    // Idempoten: koneksi yang sudah terdaftar tak dibuat ulang.
+    await CapacitorSQLite.createConnection({
+      database: DB,
+      version: DB_VERSION,
+    });
+    // open membuka koneksi (re-open aman).
     await CapacitorSQLite.open({ database: DB });
     // PRAGMA foreign_keys harus di luar transaksi (no-op di dalam tx).
     await rawRun("PRAGMA foreign_keys = ON");
@@ -131,6 +133,26 @@ export function ensureDb(): Promise<void> {
     ready = null; // init gagal → beri kesempatan dicoba lagi
   });
   return ready;
+}
+
+/**
+ * Tutup koneksi DB (dipakai restore backup: close → ganti isi → open).
+ * Tutup koneksi (close) lalu hapus dari registry (closeConnection).
+ * Setelah ini ensureDb() akan menginisialisasi ulang dari nol.
+ */
+export async function closeDb(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    await CapacitorSQLite.close({ database: DB });
+  } catch {
+    // koneksi mungkin sudah tertutup — abaikan.
+  }
+  try {
+    await CapacitorSQLite.closeConnection({ database: DB });
+  } catch {
+    // koneksi mungkin sudah terhapus dari registry — abaikan.
+  }
+  ready = null;
 }
 
 // ——— helper publik (selalu memastikan DB siap) ———
