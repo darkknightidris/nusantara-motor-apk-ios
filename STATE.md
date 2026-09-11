@@ -1,9 +1,10 @@
 # STATE — Source of Truth
 
-Update: 2026-09-10 (sesi 5)
-**Posisi sekarang: FASE 3 (T03 adaptasi modul) — T02 sub-task 1–7/8 selesai (sub-8 uji runtime → FASE 5)** — FASE 1 SELESAI & terverifikasi.
-Log: `C:\temp\nusantara_t01b.log` · Status: `C:\temp\nusantara_t01_status.txt`
-(nilai: `T01_RUNNING` / `T01_DONE` / `T01_FAIL_<langkah>`)
+Update: 2026-09-11 (sesi 6)
+**Posisi sekarang: FASE 3 (T03 adaptasi modul) — app-blank FIXED & terverifikasi di :3100**.
+- Bug "app blank" (app :3100 tampil blank di browser) SELESAI: akar = `RequireAuth` di `app/(app)/layout.tsx` membungkus SEMUA halaman termasuk `/login` → guard render `null` → blank, dan `/login` pun blank (tak bisa login). Fix: `/login` jadi rute PUBLIK (`app/login/`) + `Shell` komponen bersama; group `(app)` = dashboard/katalog/penjualan/keuangan/panduan/profil/users (di-guard). Commit `1bf8685`.
+- Sisa T03: `lib/backup.ts` (backup/restore) + verifikasi end-to-end (login → dashboard) di browser + build final.
+Log sesi ini: diagnosis app-blank + restructure auth (lihat `06-LOG-SESI.md`).
 
 ## Checklist Fase
 
