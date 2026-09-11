@@ -8,7 +8,8 @@ const items = [
   { href: "/dashboard", label: "Beranda" },
   { href: "/katalog", label: "Katalog" },
   { href: "/penjualan", label: "Jual" },
-  { href: "/login", label: "Akun" },
+  { href: "/keuangan", label: "Keuangan" },
+  { href: "/profil", label: "Profil" },
 ];
 
 export default function BottomNav() {

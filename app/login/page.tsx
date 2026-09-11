@@ -1,6 +1,8 @@
 "use client";
 
-// Login terhadap backend FastAPI lama (POST /auth/login, Bearer JWT).
+// Login terhadap DB lokal (hash SHA-256 + salt). Token sesi disimpan di
+// localStorage — tidak ada jaringan / Bearer JWT. Ini halaman PUBLIK (tidak
+// di-guard RequireAuth) — satu-satunya rute yang bisa diakses tanpa sesi.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/session";
