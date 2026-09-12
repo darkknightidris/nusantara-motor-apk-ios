@@ -6,7 +6,7 @@
 // renders. Token lokal (bukan JWT; "local-<user_id>") hanya nilai sesi di
 // localStorage — tidak ada secret yang masuk ke bundle client.
 import { useCallback, useSyncExternalStore } from "react";
-import type { AuthUser, LoginResponse } from "@/lib/types";
+import type { AuthUser, LoginResponse, Role } from "@/lib/types";
 
 const STORAGE_KEY = "***";
 const CHANGE_EVENT = "nm-session-changed";
@@ -71,9 +71,18 @@ export function useSession() {
     persist({ token: res.token, user: { id: "", username: res.username, role: res.role } });
   }, []);
 
+  const register = useCallback(
+    async (username: string, password: string, role: Role) => {
+      const { localApi: api } = await import("@/lib/localApi");
+      const res: LoginResponse = await api.register(username, password, role);
+      persist({ token: res.token, user: { id: "", username: res.username, role: res.role } });
+    },
+    []
+  );
+
   const logout = useCallback(() => {
     persist(EMPTY);
   }, []);
 
-  return { ...state, login, logout };
+  return { ...state, login, register, logout };
 }

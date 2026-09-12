@@ -5,6 +5,7 @@
 // di-guard RequireAuth) — satu-satunya rute yang bisa diakses tanpa sesi.
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useSession } from "@/lib/session";
 import Button from "@/components/ui/Button";
 import Field from "@/components/ui/Field";
@@ -49,7 +50,13 @@ export default function LoginPage() {
       <p className="mt-1 text-sm text-slate-500">
         Gunakan akun yang terdaftar di sistem.
       </p>
-      <form onSubmit={submit} className="mt-6 space-y-4" noValidate>
+      <p className="mt-4 text-sm text-slate-500">
+        Belum punya akun?{" "}
+        <Link href="/daftar" className="font-medium text-primary">
+          Daftar
+        </Link>
+      </p>
+      <form onSubmit={submit} className="mt-4 space-y-4" noValidate>
         <Field
           label="Username"
           value={username}

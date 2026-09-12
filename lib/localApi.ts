@@ -359,6 +359,41 @@ export const localApi = {
     return { token: `local-${u.id}`, username: String(u.username), role: u.role as Role };
   },
 
+  register: async (
+    username: string,
+    password: string,
+    role: Role
+  ): Promise<LoginResponse> => {
+    // Fitur T07 (ekstra, permintaan owner 2026-09-12): daftar akun baru.
+    // App full-offline (data lokal per-perangkat) → register boleh memilih
+    // role owner|kasir; akun owner seed (mastaufiq/admin) tetap ada.
+    const uname = username.trim();
+    if (!/^[a-z0-9_-]{3,32}$/.test(uname)) {
+      throw new ApiError(
+        400,
+        "Username: 3-32 karakter, huruf kecil/angka/-/_ saja."
+      );
+    }
+    if (password.length < 6) {
+      throw new ApiError(400, "Password minimal 6 karakter.");
+    }
+    if (role !== "owner" && role !== "kasir") {
+      throw new ApiError(400, "Role tidak valid (owner/kasir).");
+    }
+    const dup = (
+      await qAll("users", "SELECT id FROM users WHERE username = ?", [uname])
+    )[0];
+    if (dup) throw new ApiError(409, "Username sudah digunakan.");
+    const salt = genSalt();
+    const hash = await hashPassword(password, salt);
+    const id = uuid();
+    await run(
+      "INSERT INTO users (id, username, password_hash, salt, role, created_at) VALUES (?,?,?,?,?,?)",
+      [id, uname, hash, salt, role, nowISO()]
+    );
+    return { token: `local-${id}`, username: uname, role };
+  },
+
   me: async (): Promise<AuthUser> => {
     const sess = getSession();
     if (!sess.user) throw new ApiError(401, "Belum login");
