@@ -1,11 +1,12 @@
 # STATE — Source of Truth
 
-Update: 2026-09-11 (sesi 7)
-**Posisi sekarang: FASE 3 (T03) SELESAI — verifikasi E2E di browser + build final (commit sesi 7)**.
-- T03 SELESAI: semua modul (dashboard/katalog/penjualan/keuangan/panduan/profil/users) + `lib/backup.ts` (backup/restore JSON bundle) + `Shell`/`BottomNav`/`OnlineStatus` + login rute publik — semua ter-commit di `1bf8685`.
-- Verifikasi sesi ini: E2E di browser (app :3100) — app render (login page + 5-tab nav + banner OFFLINE/LOKAL); semua rute group redirect ke `/login` saat belum sesi; `next build` → `out/` 18 rute; `tsc --noEmit` bersih.
+Update: 2026-09-12 (sesi 10)
+**Posisi sekarang: T07 (Beranda) — redesign hub ala BYON; grid aksi cepat + section header + ringkasan data; komit `dc30dd5`**.
+- T07 (Beranda): halaman `app/(app)/dashboard/page.tsx` redesigned = hub semua fitur — grid aksi cepat (8 tile: Jual, Katalog, Keuangan, Panduan, Tambah, Hutang, Users, Backup) + header section ("Aksi Cepat", "Ringkasan") + kartu data (penjualan hari ini, hutang/piutang, stok menipis). Pola visual BYON: tile icon warna + section header.
+- Fitur signup ditemukan: `/daftar` (rute publik `app/daftar/`) + link "Daftar" di halaman login.
+- Komitmen sesi: Beranda sebagai hub semua fitur (grid aksi cepat) + verifikasi build + pasang ke emulator.
 - **Catatan arsitektur PENTING:** app = native Android/Capacitor. Lapisan data (SQLite native) hanya jalan di dalam APK. Di browser desktop hanya UI shell yang bisa diverifikasi; data (login, dashboard, dsb.) butuh lingkungan Android native. Detail di `06-LOG-SESI.md` + `07-EROR.md`.
-Log sesi ini: E2E browser + build final + verifikasi (lihat `06-LOG-SESI.md`).
+Log sesi ini: redesign Beranda + verifikasi + komit (lihat `06-LOG-SESI.md`).
 
 ## Checklist Fase
 
