@@ -179,7 +179,7 @@ export default function DashboardPage() {
       ) : (
         data && (
           <>
-            {/* Grid aksi cepat ke semua modul. */
+            {/* Grid aksi cepat ke semua modul. */}
             <section>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Aksi Cepat</p>
               <div className="grid grid-cols-4 gap-3">
