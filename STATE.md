@@ -1,12 +1,12 @@
 # STATE — Source of Truth
 
-Update: 2026-09-12 (sesi 10)
-**Posisi sekarang: T07 (Beranda) — redesign hub ala BYON; grid aksi cepat + section header + ringkasan data; komit `dc30dd5`**.
-- T07 (Beranda): halaman `app/(app)/dashboard/page.tsx` redesigned = hub semua fitur — grid aksi cepat (8 tile: Jual, Katalog, Keuangan, Panduan, Tambah, Hutang, Users, Backup) + header section ("Aksi Cepat", "Ringkasan") + kartu data (penjualan hari ini, hutang/piutang, stok menipis). Pola visual BYON: tile icon warna + section header.
-- Fitur signup ditemukan: `/daftar` (rute publik `app/daftar/`) + link "Daftar" di halaman login.
-- Komitmen sesi: Beranda sebagai hub semua fitur (grid aksi cepat) + verifikasi build + pasang ke emulator.
+Update: 2026-09-12 (sesi 11)
+**Posisi sekarang: T07 (Beranda) — E2E verifikasi di emulator `emulator-5554`; dashboard render; build hijau; komit `e3bd5bc` (fix dashboard JSX) & `dc30dd5` (hub BYON)**.
+- T07 (Beranda): halaman `app/(app)/dashboard/page.tsx` redesigned = hub semua fitur — grid aksi cepat + header section + kartu data. Komit `dc30dd5`.
+- Fix dashboard JSX (komentari `{/* */` tanpa tutup) terkunci di `e3bd5bc`; build hijau (19 rute).
+- E2E di emulator: app `com.nusantaramotor.apk` ter-launch & render (banner OFFLINE, sapaan, kartu ringkasan, bottom nav). Temuan: bug data — bagian "Stok menipis" tampil "undefined" (2 item; `p.name` undefined) → bug runtime di `getLowStock`/`toProduct` yang masih perlu difix.
 - **Catatan arsitektur PENTING:** app = native Android/Capacitor. Lapisan data (SQLite native) hanya jalan di dalam APK. Di browser desktop hanya UI shell yang bisa diverifikasi; data (login, dashboard, dsb.) butuh lingkungan Android native. Detail di `06-LOG-SESI.md` + `07-EROR.md`.
-Log sesi ini: redesign Beranda + verifikasi + komit (lihat `06-LOG-SESI.md`).
+Log sesi ini: E2E verifikasi di emulator + fix dashboard JSX + komit (lihat `06-LOG-SESI.md`).
 
 ## Checklist Fase
 
