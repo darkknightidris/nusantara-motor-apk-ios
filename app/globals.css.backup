@@ -1,24 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f6f8;
-  --foreground: #111318;
+  --background: #f4f6f8;
+  --foreground: #111827;
 
-  --primary: #111827;
-  --primary-hover: #1f2937;
-  --accent: #c99a2e;
+  --primary: #0f172a;
+  --primary-hover: #1e293b;
+  --accent: #d4a72c;
 
-  --success: #16803c;
-  --warning: #b7791f;
-  --danger: #c53030;
+  --success: #15803d;
+  --warning: #b45309;
+  --danger: #b91c1c;
 
   --surface: #ffffff;
-  --surface-soft: #f8f9fb;
+  --surface-soft: #f8fafc;
   --border-soft: #e5e7eb;
 
-  --shadow-soft: 0 2px 10px rgba(15, 23, 42, .045);
-  --shadow-card: 0 10px 30px rgba(15, 23, 42, .07);
-  --shadow-elevated: 0 18px 45px rgba(15, 23, 42, .10);
+  --shadow-soft: 0 2px 12px rgba(15, 23, 42, 0.06);
+  --shadow-card: 0 8px 30px rgba(15, 23, 42, 0.07);
 }
 
 @theme inline {
@@ -26,6 +25,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-accent: var(--accent);
@@ -37,10 +37,6 @@
   --color-border-soft: var(--border-soft);
 }
 
-* {
-  box-sizing: border-box;
-}
-
 html {
   -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
@@ -48,9 +44,7 @@ html {
 
 body {
   margin: 0;
-  background:
-    radial-gradient(circle at 50% -20%, rgba(201,154,46,.06), transparent 35%),
-    var(--background);
+  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -60,6 +54,19 @@ body {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Native-feel interaction */
+button,
+a {
   transition:
     transform 140ms ease,
     opacity 140ms ease,
@@ -69,63 +76,9 @@ a {
     color 180ms ease;
 }
 
-button {
-  touch-action: manipulation;
-}
-
 button:active,
 a:active {
-  transform: scale(.975);
-}
-
-.nm-card {
-  background: rgba(255,255,255,.94);
-  border: 1px solid rgba(229,231,235,.9);
-  border-radius: 20px;
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(12px);
-}
-
-.nm-card-elevated {
-  box-shadow: var(--shadow-elevated);
-}
-
-.nm-enter {
-  animation: nm-fade-up 280ms cubic-bezier(.22,1,.36,1) both;
-}
-
-@keyframes nm-fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.nm-safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-input,
-select,
-textarea {
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    background-color 160ms ease;
-}
-
-input:focus,
-select:focus,
-textarea:focus {
-  outline: none;
-}
-
-::selection {
-  background: rgba(201,154,46,.18);
+  transform: scale(0.975);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -133,9 +86,43 @@ textarea:focus {
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    animation-duration: .01ms !important;
-    transition-duration: .01ms !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
   }
+}
+
+/* Premium surface utility */
+.nm-card {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft);
+}
+
+.nm-card-elevated {
+  box-shadow: var(--shadow-card);
+}
+
+/* Subtle entrance animation */
+@keyframes nm-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nm-enter {
+  animation: nm-fade-up 260ms ease-out both;
+}
+
+/* Mobile safe-area support */
+.nm-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 @media print {

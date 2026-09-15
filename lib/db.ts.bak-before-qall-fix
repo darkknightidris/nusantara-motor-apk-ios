@@ -56,28 +56,21 @@ function nativeGuard(): void {
 // ——— helper raw (internal; TANPA ensureDb — dipakai oleh ensureDb) ———
 
 async function rawRun(sql: string, params: Param[] = []): Promise<void> {
-  await CapacitorSQLite.run({ database: DB, statement: sql, values: params, transaction: !inTx });
+  await CapacitorSQLite.run({ database: DB, statement: sql, values: params });
 }
 
-type SqlQueryRow = Param[] | Record<string, unknown>;
-
-async function rawQuery(
-  sql: string,
-  params: Param[] = []
-): Promise<SqlQueryRow[]> {
+async function rawQuery(sql: string, params: Param[] = []): Promise<Param[][]> {
   const res = await CapacitorSQLite.query({
     database: DB,
     statement: sql,
     values: params,
   });
-
-  return (res.values ?? []) as SqlQueryRow[];
+  return (res.values ?? []) as Param[][];
 }
 
 // ——— state ———
 
 let ready: Promise<void> | null = null;
-let inTx = false;
 const tableCols = new Map<string, string[]>();
 
 /**
@@ -107,13 +100,7 @@ export function ensureDb(): Promise<void> {
     });
     // Versi skema (meta.db_version)
     const v = await rawQuery("SELECT value FROM meta WHERE key = 'db_version'");
-    const cur = v.length
-      ? String(
-          Array.isArray(v[0])
-            ? v[0][0]
-            : (v[0] as Record<string, unknown>)["value"]
-        )
-      : null;
+    const cur = v.length ? String(v[0][0]) : null;
     if (cur === null) {
       await rawRun("INSERT INTO meta (key, value) VALUES ('db_version', ?)", [
         String(DB_VERSION),
@@ -172,7 +159,7 @@ export async function closeDb(): Promise<void> {
 
 /** Eksekusi statement tunggal; `params` di-bind dengan placeholder `?`. */
 export async function run(sql: string, params: Param[] = []): Promise<void> {
-  if (!inTx) await ensureDb();
+  await ensureDb();
   await rawRun(sql, params);
 }
 
@@ -182,22 +169,7 @@ export async function qRows(
   params: Param[] = []
 ): Promise<Param[][]> {
   await ensureDb();
-
-  const rows = await rawQuery(sql, params);
-
-  return rows.map((row) => {
-    if (Array.isArray(row)) {
-      return row.map((v) => v as Param);
-    }
-
-    return Object.values(row).map((v) => {
-      if (v === null || typeof v === "string" || typeof v === "number") {
-        return v;
-      }
-
-      return v == null ? null : String(v);
-    });
-  });
+  return rawQuery(sql, params);
 }
 
 /**
@@ -210,51 +182,13 @@ export async function qAll(
   params: Param[] = []
 ): Promise<Row[]> {
   await ensureDb();
-
   const cols = await tableColumns(table);
-
-  // qAll memetakan hasil berdasarkan urutan kolom schema.
-  // Karena itu projection SELECT harus selalu berupa SELECT *.
-  // Kita pertahankan WHERE / ORDER BY / LIMIT dari query pemanggil,
-  // tetapi paksa projection menjadi SELECT * agar posisi nilai
-  // selalu identik dengan PRAGMA table_info().
-  const normalizedSql = sql.replace(
-    /^\s*SELECT\s+[\s\S]*?\s+FROM\s+/i,
-    `SELECT * FROM `
-  );
-
-  const values = await rawQuery(normalizedSql, params);
-
-  return values.map((rawRow) => {
+  const values = await rawQuery(sql, params);
+  return values.map((vals) => {
     const row: Row = {};
-
-    if (Array.isArray(rawRow)) {
-      cols.forEach((name, i) => {
-        const value = rawRow[i];
-        row[name] =
-          value === null ||
-          typeof value === "string" ||
-          typeof value === "number"
-            ? value
-            : value == null
-              ? null
-              : String(value);
-      });
-    } else {
-      cols.forEach((name) => {
-        const value = rawRow[name];
-
-        row[name] =
-          value === null ||
-          typeof value === "string" ||
-          typeof value === "number"
-            ? value
-            : value == null
-              ? null
-              : String(value);
-      });
-    }
-
+    cols.forEach((name, i) => {
+      row[name] = (vals[i] ?? null) as string | number | null;
+    });
     return row;
   });
 }
@@ -263,11 +197,7 @@ async function tableColumns(table: string): Promise<string[]> {
   const hit = tableCols.get(table);
   if (hit) return hit;
   const rows = await rawQuery(`PRAGMA table_info(${table})`);
-  const names = rows.map((v) =>
-    Array.isArray(v)
-      ? String(v[1])
-      : String((v as Record<string, unknown>)["name"])
-  );
+  const names = rows.map((v) => String(v[1]));
   tableCols.set(table, names);
   return names;
 }
@@ -279,17 +209,16 @@ async function tableColumns(table: string): Promise<string[]> {
 export async function tx(fn: () => Promise<void>): Promise<void> {
   await ensureDb();
   await CapacitorSQLite.beginTransaction({ database: DB });
-  inTx = true;
   try {
     await fn();
     await CapacitorSQLite.commitTransaction({ database: DB });
   } catch (e) {
     try {
       await CapacitorSQLite.rollbackTransaction({ database: DB });
-    } catch {}
+    } catch {
+      // abaikan — rollback gagal biasanya karena transaksi sudah tutup
+    }
     throw e;
-  } finally {
-    inTx = false;
   }
 }
 
@@ -322,9 +251,3 @@ export function deriveStatus(
 ): "lunas" | "belum_lunas" {
   return paidAmount >= totalAmount ? "lunas" : "belum_lunas";
 }
-
-
-
-
-
-

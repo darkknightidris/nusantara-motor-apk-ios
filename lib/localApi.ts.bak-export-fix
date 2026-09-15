@@ -195,53 +195,20 @@ function toDisplayUrl(path: string | null): string {
 
 // â€”â€”â€” ekspor file: SheetJS/jsPDF â†’ Filesystem â†’ Share â€”â€”â€”
 
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunkSize = 0x8000;
-
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-    binary += String.fromCharCode(...chunk);
-  }
-
-  return btoa(binary);
-}
-
 async function exportFileToShare(
   name: string,
   bytes: ArrayBuffer | Uint8Array,
   mime: string
 ): Promise<void> {
-  const data = new Uint8Array(
-    bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
-  );
-
+  const data = new Uint8Array(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes));
   const path = `nm-export/${name}-${Date.now()}`;
-
-  try {
-    await Filesystem.mkdir({
-      path: "nm-export",
-      directory: Directory.Documents,
-      recursive: true,
-    });
-  } catch (error) {
-    const message = String(error);
-    if (!message.includes("OS-PLUG-FILE-0010") && !message.includes("already exists")) {
-      throw error;
-    }
-  }
-
   const written = await Filesystem.writeFile({
     path,
-    data: bytesToBase64(data),
+    data: new Blob([data]),
     directory: Directory.Documents,
   });
-
   await Share.share({
-    title: name,
-    text: name,
-    files: [written.uri],
-    dialogTitle: `Bagikan ${name}`,
+    files: [written.uri ?? Capacitor.convertFileSrc(path)],
   });
 }
 
@@ -1011,7 +978,4 @@ function toGuideRow(r: Row): ProductGuide {
     products: null,
   };
 }
-
-
-
 

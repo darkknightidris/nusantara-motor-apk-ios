@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "info";
 
@@ -7,7 +7,7 @@ const tones: Record<Tone, string> = {
   success: "bg-emerald-50 text-success",
   warning: "bg-amber-50 text-warning",
   danger: "bg-red-50 text-danger",
-  info: "bg-blue-50 text-primary",
+  info: "bg-slate-100 text-primary",
 };
 
 export default function Badge({
@@ -21,7 +21,7 @@ export default function Badge({
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${tones[tone]} ${className}`}
+      className={`inline-flex min-h-6 items-center rounded-full px-2.5 text-[11px] font-bold tracking-wide ${tones[tone]} ${className}`}
     >
       {children}
     </span>

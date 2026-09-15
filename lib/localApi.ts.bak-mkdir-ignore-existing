@@ -218,18 +218,11 @@ async function exportFileToShare(
 
   const path = `nm-export/${name}-${Date.now()}`;
 
-  try {
-    await Filesystem.mkdir({
-      path: "nm-export",
-      directory: Directory.Documents,
-      recursive: true,
-    });
-  } catch (error) {
-    const message = String(error);
-    if (!message.includes("OS-PLUG-FILE-0010") && !message.includes("already exists")) {
-      throw error;
-    }
-  }
+  await Filesystem.mkdir({
+    path: "nm-export",
+    directory: Directory.Documents,
+    recursive: true,
+  });
 
   const written = await Filesystem.writeFile({
     path,
@@ -1011,7 +1004,6 @@ function toGuideRow(r: Row): ProductGuide {
     products: null,
   };
 }
-
 
 
 

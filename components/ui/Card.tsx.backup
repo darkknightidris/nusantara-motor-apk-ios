@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 
 export default function Card({
   title,
@@ -13,12 +13,12 @@ export default function Card({
 }) {
   return (
     <section
-      className={`nm-card group overflow-hidden p-4 transition-all duration-200 hover:-translate-y-[1px] hover:shadow-md ${className}`}
+      className={`nm-card overflow-hidden p-4 transition-all duration-200 ${className}`}
     >
       {(title || action) && (
         <header className="mb-4 flex items-center justify-between gap-3">
           {title ? (
-            <h2 className="text-[15px] font-bold tracking-[-0.025em] text-foreground">
+            <h2 className="text-[15px] font-bold tracking-[-0.02em] text-foreground">
               {title}
             </h2>
           ) : (
@@ -27,7 +27,6 @@ export default function Card({
           {action}
         </header>
       )}
-
       {children}
     </section>
   );

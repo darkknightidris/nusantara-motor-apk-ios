@@ -1,28 +1,28 @@
-"use client";
+﻿"use client";
 
-// Lapisan DB lokal (SQLite) — pengganti backend FastAPI + Supabase.
+// Lapisan DB lokal (SQLite) â€” pengganti backend FastAPI + Supabase.
 // DB file disimpan di app data dir app via @capacitor-community/sqlite
 // (v8: API options-object, `CapacitorSQLite` = instance singleton).
 // Tidak ada satu pun panggilan jaringan.
 //
 // LIFECYCLE v8 (connection-based, terverifikasi dari native Java plugin):
-//   createConnection → open → query/run → begin/commit/rollback →
-//   close → closeConnection
+//   createConnection â†’ open â†’ query/run â†’ begin/commit/rollback â†’
+//   close â†’ closeConnection
 // Tiap method native lookup koneksi di registry `dbDict`; bila koneksi
 // tak terdaftar, native melempang "No available connection". Koneksi
 // HARUS didaftarkan via `createConnection` SEBELUM `open`.
 //
 // Pola: ensureDb() lazy + singleton per sesi webview. Init sekali &
-// idempoten: createConnection → open → PRAGMA foreign_keys →
-// CREATE TABLE IF NOT EXISTS (batch) → cek/set meta.db_version
+// idempoten: createConnection â†’ open â†’ PRAGMA foreign_keys â†’
+// CREATE TABLE IF NOT EXISTS (batch) â†’ cek/set meta.db_version
 // (strategi migrasi, 04-SCHEMA-DB.md).
 //
 // Helper query:
-//   run(sql, params)      — eksekusi statement tunggal (INSERT/UPDATE/
+//   run(sql, params)      â€” eksekusi statement tunggal (INSERT/UPDATE/
 //                           DELETE/DDL/PRAGMA), values di-bind via `?`
-//   qAll(table, sql)      — SELECT * dari table → array Record (nama kolom)
-//   qRows(sql, params)    — SELECT bebas → array array nilai (tanpa mapping)
-//   tx(fn)               — fn dalam satu transaksi native (begin/commit/rollback)
+//   qAll(table, sql)      â€” SELECT * dari table â†’ array Record (nama kolom)
+//   qRows(sql, params)    â€” SELECT bebas â†’ array array nilai (tanpa mapping)
+//   tx(fn)               â€” fn dalam satu transaksi native (begin/commit/rollback)
 //
 // CATATAN: helper publik memanggil ensureDb() dulu. Di dalam ensureDb()
 // kita memakai helper raw* (tanpa ensure) agar bebas rekursi/deadlock.
@@ -33,14 +33,14 @@ import { DB_NAME, DB_VERSION, SCHEMA_DDL } from "@/lib/schema";
 import { genSalt, hashPassword } from "@/lib/hash";
 
 // Akun awal (keputusan terkunci 01-SPEK #3): mastaufiq / admin, role owner.
-// (Bukan asumsi admin/admin123 di teks tugas T02 — keputusan STATE.md menang.)
+// (Bukan asumsi admin/admin123 di teks tugas T02 â€” keputusan STATE.md menang.)
 const SEED_USERNAME = "mastaufiq";
 const SEED_PASSWORD = "admin";
 const SEED_ROLE = "owner";
 
 export { DB_NAME, DB_VERSION };
 
-/** Satu baris hasil query (nama kolom → nilai). */
+/** Satu baris hasil query (nama kolom â†’ nilai). */
 export type Row = Record<string, string | number | null>;
 
 type Param = string | number | null;
@@ -53,10 +53,10 @@ function nativeGuard(): void {
   }
 }
 
-// ——— helper raw (internal; TANPA ensureDb — dipakai oleh ensureDb) ———
+// â€”â€”â€” helper raw (internal; TANPA ensureDb â€” dipakai oleh ensureDb) â€”â€”â€”
 
 async function rawRun(sql: string, params: Param[] = []): Promise<void> {
-  await CapacitorSQLite.run({ database: DB, statement: sql, values: params, transaction: !inTx });
+  await CapacitorSQLite.run({ database: DB, statement: sql, values: params });
 }
 
 type SqlQueryRow = Param[] | Record<string, unknown>;
@@ -74,17 +74,16 @@ async function rawQuery(
   return (res.values ?? []) as SqlQueryRow[];
 }
 
-// ——— state ———
+// â€”â€”â€” state â€”â€”â€”
 
 let ready: Promise<void> | null = null;
-let inTx = false;
 const tableCols = new Map<string, string[]>();
 
 /**
  * Inisialisasi DB (idempoten, aman dipanggil berulang).
- * createConnection → open → PRAGMA foreign_keys → DDL →
+ * createConnection â†’ open â†’ PRAGMA foreign_keys â†’ DDL â†’
  * meta.db_version. Koneksi didaftarkan SELESAI dulu (createConnection)
- * lalu dibuka (open) — pola v8 connection-based.
+ * lalu dibuka (open) â€” pola v8 connection-based.
  */
 export function ensureDb(): Promise<void> {
   if (ready) return ready;
@@ -100,20 +99,14 @@ export function ensureDb(): Promise<void> {
     await CapacitorSQLite.open({ database: DB });
     // PRAGMA foreign_keys harus di luar transaksi (no-op di dalam tx).
     await rawRun("PRAGMA foreign_keys = ON");
-    // DDL idempoten (semua IF NOT EXISTS) — aman utk app yang sudah pernah jalan.
+    // DDL idempoten (semua IF NOT EXISTS) â€” aman utk app yang sudah pernah jalan.
     await CapacitorSQLite.execute({
       database: DB,
       statements: SCHEMA_DDL.join(";\n"),
     });
     // Versi skema (meta.db_version)
     const v = await rawQuery("SELECT value FROM meta WHERE key = 'db_version'");
-    const cur = v.length
-      ? String(
-          Array.isArray(v[0])
-            ? v[0][0]
-            : (v[0] as Record<string, unknown>)["value"]
-        )
-      : null;
+    const cur = v.length ? String(v[0][0]) : null;
     if (cur === null) {
       await rawRun("INSERT INTO meta (key, value) VALUES ('db_version', ?)", [
         String(DB_VERSION),
@@ -143,13 +136,13 @@ export function ensureDb(): Promise<void> {
     }
   })();
   ready.catch(() => {
-    ready = null; // init gagal → beri kesempatan dicoba lagi
+    ready = null; // init gagal â†’ beri kesempatan dicoba lagi
   });
   return ready;
 }
 
 /**
- * Tutup koneksi DB (dipakai restore backup: close → ganti isi → open).
+ * Tutup koneksi DB (dipakai restore backup: close â†’ ganti isi â†’ open).
  * Tutup koneksi (close) lalu hapus dari registry (closeConnection).
  * Setelah ini ensureDb() akan menginisialisasi ulang dari nol.
  */
@@ -158,21 +151,21 @@ export async function closeDb(): Promise<void> {
   try {
     await CapacitorSQLite.close({ database: DB });
   } catch {
-    // koneksi mungkin sudah tertutup — abaikan.
+    // koneksi mungkin sudah tertutup â€” abaikan.
   }
   try {
     await CapacitorSQLite.closeConnection({ database: DB });
   } catch {
-    // koneksi mungkin sudah terhapus dari registry — abaikan.
+    // koneksi mungkin sudah terhapus dari registry â€” abaikan.
   }
   ready = null;
 }
 
-// ——— helper publik (selalu memastikan DB siap) ———
+// â€”â€”â€” helper publik (selalu memastikan DB siap) â€”â€”â€”
 
 /** Eksekusi statement tunggal; `params` di-bind dengan placeholder `?`. */
 export async function run(sql: string, params: Param[] = []): Promise<void> {
-  if (!inTx) await ensureDb();
+  await ensureDb();
   await rawRun(sql, params);
 }
 
@@ -263,11 +256,7 @@ async function tableColumns(table: string): Promise<string[]> {
   const hit = tableCols.get(table);
   if (hit) return hit;
   const rows = await rawQuery(`PRAGMA table_info(${table})`);
-  const names = rows.map((v) =>
-    Array.isArray(v)
-      ? String(v[1])
-      : String((v as Record<string, unknown>)["name"])
-  );
+  const names = rows.map((v) => String(v[1]));
   tableCols.set(table, names);
   return names;
 }
@@ -279,17 +268,16 @@ async function tableColumns(table: string): Promise<string[]> {
 export async function tx(fn: () => Promise<void>): Promise<void> {
   await ensureDb();
   await CapacitorSQLite.beginTransaction({ database: DB });
-  inTx = true;
   try {
     await fn();
     await CapacitorSQLite.commitTransaction({ database: DB });
   } catch (e) {
     try {
       await CapacitorSQLite.rollbackTransaction({ database: DB });
-    } catch {}
+    } catch {
+      // abaikan â€” rollback gagal biasanya karena transaksi sudah tutup
+    }
     throw e;
-  } finally {
-    inTx = false;
   }
 }
 
@@ -314,7 +302,7 @@ export function nowISO(): string {
 
 /**
  * Derivasi status transaksi dari paid/total (logika yang tadinya di
- * backend FastAPI — dipindah ke klien sesuai T02).
+ * backend FastAPI â€” dipindah ke klien sesuai T02).
  */
 export function deriveStatus(
   paidAmount: number,
@@ -322,9 +310,5 @@ export function deriveStatus(
 ): "lunas" | "belum_lunas" {
   return paidAmount >= totalAmount ? "lunas" : "belum_lunas";
 }
-
-
-
-
 
 
